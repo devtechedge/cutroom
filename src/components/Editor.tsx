@@ -240,10 +240,12 @@ function EditorInner({ resolve, onAddAsset, onBack, onDelete, saveStatus, theme,
           items={[
             { label: "Board settings", onSelect: () => setBoardDialog(true) },
             { label: "Keyboard shortcuts", onSelect: () => setShortcuts(true) },
-            { label: theme === "dark" ? "Light theme" : "Dark theme", separatorBefore: true, onSelect: onToggleTheme },
             { label: "Delete board", danger: true, separatorBefore: true, onSelect: () => setConfirmDelete(true) },
           ]}
         />
+        <button type="button" className="icon-btn" onClick={onToggleTheme} aria-label={theme === "dark" ? "Switch to light theme" : "Switch to dark theme"}>
+          <Icon name={theme === "dark" ? "sun" : "moon"} />
+        </button>
       </header>
 
       {!persistent && (
