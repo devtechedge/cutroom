@@ -1,9 +1,7 @@
 import type { JSX, ReactNode } from "react";
+import { FEEDBACK_URL, REPO_URL, SECURITY_URL } from "../lib/links";
 import { Icon } from "./Icon";
-
-const REPO = "https://github.com/devtechedge/cutroom";
-const FEEDBACK = "https://github.com/devtechedge/cutroom/issues/new/choose";
-const SECURITY = "https://github.com/devtechedge/cutroom/security/advisories/new";
+import { SiteFooter } from "./SiteFooter";
 
 function ThemeButton({ theme, onToggleTheme }: { theme: "dark" | "light"; onToggleTheme: () => void }): JSX.Element {
   return (
@@ -29,34 +27,6 @@ function SiteHeader({ theme, onToggleTheme }: { theme: "dark" | "light"; onToggl
       </a>
       <ThemeButton theme={theme} onToggleTheme={onToggleTheme} />
     </header>
-  );
-}
-
-export function SiteFooter(): JSX.Element {
-  return (
-    <footer className="site-footer">
-      <div className="site-footer-brand">
-        <span className="wordmark">
-          <Icon name="logo" size={16} />
-          CUTROOM
-        </span>
-        <p>Storyboard the cut before you shoot it. Runs in your browser, keeps boards on your machine.</p>
-      </div>
-      <nav className="site-footer-links" aria-label="Product and legal">
-        <a href="#/welcome">Why CUTROOM</a>
-        <a href="#/">Open studio</a>
-        <a href="#/privacy">Privacy</a>
-        <a href="#/terms">Terms</a>
-        <a href="#/contact">Contact</a>
-        <a href={FEEDBACK} target="_blank" rel="noopener noreferrer">
-          Feedback
-        </a>
-        <a href={REPO} target="_blank" rel="noopener noreferrer">
-          GitHub
-        </a>
-      </nav>
-      <p className="site-footer-note mono">MIT licensed · no account · no telemetry</p>
-    </footer>
   );
 }
 
@@ -242,7 +212,7 @@ export function PrivacyPage({ theme, onToggleTheme }: { theme: "dark" | "light";
         <h2>Security reports</h2>
         <p>
           Please report vulnerabilities through the private advisory form at{" "}
-          <a href={SECURITY} target="_blank" rel="noopener noreferrer">
+          <a href={SECURITY_URL} target="_blank" rel="noopener noreferrer">
             GitHub Security Advisories
           </a>
           , not a public issue.
@@ -311,28 +281,28 @@ export function ContactPage({ theme, onToggleTheme }: { theme: "dark" | "light";
         <section className="contact-card">
           <h2>Report a bug</h2>
           <p>Include the board you were editing, what you expected, what happened, and your browser. A screenshot helps.</p>
-          <a className="btn" href={FEEDBACK} target="_blank" rel="noopener noreferrer">
+          <a className="btn" href={FEEDBACK_URL} target="_blank" rel="noopener noreferrer">
             Open an issue
           </a>
         </section>
         <section className="contact-card">
           <h2>Request a feature</h2>
           <p>Say which part of the workflow it improves: composing, timing, reviewing or exporting.</p>
-          <a className="btn" href={FEEDBACK} target="_blank" rel="noopener noreferrer">
+          <a className="btn" href={FEEDBACK_URL} target="_blank" rel="noopener noreferrer">
             Share an idea
           </a>
         </section>
         <section className="contact-card">
           <h2>Report a security issue</h2>
           <p>Use a private advisory so the report is not public while it is being fixed.</p>
-          <a className="btn" href={SECURITY} target="_blank" rel="noopener noreferrer">
+          <a className="btn" href={SECURITY_URL} target="_blank" rel="noopener noreferrer">
             Private advisory
           </a>
         </section>
         <section className="contact-card">
           <h2>Read the source</h2>
           <p>Licensed under MIT. Issues, pull requests and the release history live in the repository.</p>
-          <a className="btn" href={REPO} target="_blank" rel="noopener noreferrer">
+          <a className="btn" href={REPO_URL} target="_blank" rel="noopener noreferrer">
             Open GitHub
           </a>
         </section>

@@ -25,12 +25,15 @@ import { formatBytes } from "./lib/format";
 import { Gallery } from "./components/Gallery";
 import type { SaveStatus } from "./components/Editor";
 import { NewProjectDialog } from "./components/NewProjectDialog";
-import { PrintSheet } from "./components/PrintSheet";
-import { Welcome, PrivacyPage, TermsPage, ContactPage } from "./components/InfoPages";
 import { Dialog, Toast } from "./components/ui";
 import { Icon } from "./components/Icon";
 
 const Editor = lazy(() => import("./components/Editor").then((module) => ({ default: module.Editor })));
+const PrintSheet = lazy(() => import("./components/PrintSheet").then((module) => ({ default: module.PrintSheet })));
+const Welcome = lazy(() => import("./components/InfoPages").then((module) => ({ default: module.Welcome })));
+const PrivacyPage = lazy(() => import("./components/InfoPages").then((module) => ({ default: module.PrivacyPage })));
+const TermsPage = lazy(() => import("./components/InfoPages").then((module) => ({ default: module.TermsPage })));
+const ContactPage = lazy(() => import("./components/InfoPages").then((module) => ({ default: module.ContactPage })));
 
 type Theme = "dark" | "light";
 type InfoPage = "privacy" | "terms" | "contact";
@@ -70,6 +73,15 @@ function storeFlag(key: string, value: string): void {
     localStorage.setItem(key, value);
   } catch {
     // preference persistence is best-effort
+  }
+}
+
+/** Keep first paint and first interaction clear of storage bookkeeping. */
+function runWhenIdle(task: () => void): void {
+  if (typeof window.requestIdleCallback === "function") {
+    window.requestIdleCallback(task, { timeout: 1500 });
+  } else {
+    window.setTimeout(task, 100);
   }
 }
 
@@ -153,10 +165,6 @@ export default function App(): JSX.Element {
   const saveTimer = useRef<number | undefined>(undefined);
   const pendingSaves = useRef<Map<string, Storyboard>>(new Map());
   const deletedIds = useRef<Set<string>>(new Set());
-  const assetsRef = useRef<Map<string, Asset>>(assets);
-  useEffect(() => {
-    assetsRef.current = assets;
-  }, [assets]);
 
   const showToast = useCallback((msg: string) => {
     setToast(msg);
@@ -221,35 +229,41 @@ export default function App(): JSX.Element {
         setTrash(keptTrash);
         setBooted(true);
         if (seeded) {
-          void Promise.all(list.map((sb) => saveProject(lib.db, sb)))
-            .then(() => {
-              if (lib.persistent) markSeeded();
-              for (const id of deletedIds.current) void deleteProjectRecord(lib.db, id).catch(() => undefined);
-            })
-            .catch(() => undefined);
+          runWhenIdle(() => {
+            void Promise.all(list.map((sb) => saveProject(lib.db, sb)))
+              .then(() => {
+                if (lib.persistent) markSeeded();
+                for (const id of deletedIds.current) void deleteProjectRecord(lib.db, id).catch(() => undefined);
+              })
+              .catch(() => undefined);
+          });
         }
-        for (const record of expiredTrash) {
-          void deleteTrashRecord(lib.db, record.storyboard.id).catch(() => undefined);
-        }
-        // drop assets no active or recoverable board references anymore
-        try {
-          const referenced = new Set<string>();
-          for (const sb of [...list, ...keptTrash.map((r) => r.storyboard)]) {
-            for (const f of sb.frames) for (const o of f.objects) if (o.kind === "image") referenced.add(o.assetId);
+        runWhenIdle(() => {
+          for (const record of expiredTrash) {
+            void deleteTrashRecord(lib.db, record.storyboard.id).catch(() => undefined);
           }
-          for (const asset of lib.assets.values()) {
-            if (!referenced.has(asset.id)) {
-              await deleteAssetRecord(lib.db, asset.id);
-              setAssets((prev) => {
-                const next = new Map(prev);
-                next.delete(asset.id);
-                return next;
-              });
+          // drop assets no active or recoverable board references anymore
+          void (async () => {
+            try {
+              const referenced = new Set<string>();
+              for (const sb of [...list, ...keptTrash.map((r) => r.storyboard)]) {
+                for (const f of sb.frames) for (const o of f.objects) if (o.kind === "image") referenced.add(o.assetId);
+              }
+              for (const asset of lib.assets.values()) {
+                if (!referenced.has(asset.id)) {
+                  await deleteAssetRecord(lib.db, asset.id);
+                  setAssets((prev) => {
+                    const next = new Map(prev);
+                    next.delete(asset.id);
+                    return next;
+                  });
+                }
+              }
+            } catch {
+              // GC is best-effort
             }
-          }
-        } catch {
-          // GC is best-effort
-        }
+          })();
+        });
       } catch (err) {
         if (!life.alive) return;
         setBootError(err instanceof Error ? err.message : "CUTROOM could not open its local library.");
@@ -357,10 +371,10 @@ export default function App(): JSX.Element {
 
   const resolve: AssetResolver = useCallback(
     (id: string) => {
-      const a = assetsRef.current.get(id);
+      const a = assets.get(id);
       return a ? { dataUrl: a.dataUrl, width: a.width, height: a.height } : undefined;
     },
-    [],
+    [assets],
   );
 
   const createProject = (sb: Storyboard): void => {
@@ -631,66 +645,68 @@ export default function App(): JSX.Element {
 
   return (
     <>
-      {route.name === "welcome" ? (
-        <Welcome theme={theme} onToggleTheme={() => setTheme((t) => (t === "dark" ? "light" : "dark"))} onOpenDemo={openDemo} />
-      ) : route.name === "info" ? (
-        route.page === "privacy" ? (
-          <PrivacyPage theme={theme} onToggleTheme={() => setTheme((t) => (t === "dark" ? "light" : "dark"))} />
-        ) : route.page === "terms" ? (
-          <TermsPage theme={theme} onToggleTheme={() => setTheme((t) => (t === "dark" ? "light" : "dark"))} />
-        ) : (
-          <ContactPage theme={theme} onToggleTheme={() => setTheme((t) => (t === "dark" ? "light" : "dark"))} />
-        )
-      ) : route.name === "print" && current ? (
-        <PrintSheet project={current} resolve={resolve} onBack={() => navigate({ name: "editor", id: current.id })} />
-      ) : route.name === "gallery" || !current ? (
-        <Gallery
-          projects={projects}
-          trash={trash}
-          resolve={resolve}
-          onCreate={() => setShowNew(true)}
-          onOpen={(id) => navigate({ name: "editor", id })}
-          onRename={(id, title) => {
-            const p = projects.find((x) => x.id === id);
-            if (p) commitProject({ ...p, title, updatedAt: Date.now() });
-          }}
-          onDuplicate={duplicateProject}
-          onExportJson={(id) => {
-            const p = projects.find((x) => x.id === id);
-            if (p) exportJson(p);
-          }}
-          onDelete={deleteProject}
-          onImport={(file) => void importProject(file)}
-          onRestoreStarters={restoreStarters}
-          onBackup={exportBackup}
-          onRestoreBackup={(file) => void importBackup(file)}
-          lastBackupAt={lastBackupAt}
-          reminderDismissed={reminderDismissed}
-          onDismissReminder={dismissReminder}
-          onRestoreTrash={restoreTrash}
-          onDeleteTrashForever={deleteTrashForever}
-          persistent={persistent}
-          theme={theme}
-          onToggleTheme={() => setTheme((t) => (t === "dark" ? "light" : "dark"))}
-        />
-      ) : (
-        <Suspense fallback={<BootShell line="Opening the cutting room" />}>
-          <Editor
-            key={current.id}
-            project={current}
-            onCommit={editorCommit}
+      <Suspense fallback={<BootShell line="Opening CUTROOM" />}>
+        {route.name === "welcome" ? (
+          <Welcome theme={theme} onToggleTheme={() => setTheme((t) => (t === "dark" ? "light" : "dark"))} onOpenDemo={openDemo} />
+        ) : route.name === "info" ? (
+          route.page === "privacy" ? (
+            <PrivacyPage theme={theme} onToggleTheme={() => setTheme((t) => (t === "dark" ? "light" : "dark"))} />
+          ) : route.page === "terms" ? (
+            <TermsPage theme={theme} onToggleTheme={() => setTheme((t) => (t === "dark" ? "light" : "dark"))} />
+          ) : (
+            <ContactPage theme={theme} onToggleTheme={() => setTheme((t) => (t === "dark" ? "light" : "dark"))} />
+          )
+        ) : route.name === "print" && current ? (
+          <PrintSheet project={current} resolve={resolve} onBack={() => navigate({ name: "editor", id: current.id })} />
+        ) : route.name === "gallery" || !current ? (
+          <Gallery
+            projects={projects}
+            trash={trash}
             resolve={resolve}
-            assets={assets}
-            onAddAsset={addAsset}
-            onBack={() => navigate({ name: "gallery" })}
-            onDelete={() => deleteProject(current.id)}
-            saveStatus={saveStatus}
+            onCreate={() => setShowNew(true)}
+            onOpen={(id) => navigate({ name: "editor", id })}
+            onRename={(id, title) => {
+              const p = projects.find((x) => x.id === id);
+              if (p) commitProject({ ...p, title, updatedAt: Date.now() });
+            }}
+            onDuplicate={duplicateProject}
+            onExportJson={(id) => {
+              const p = projects.find((x) => x.id === id);
+              if (p) exportJson(p);
+            }}
+            onDelete={deleteProject}
+            onImport={(file) => void importProject(file)}
+            onRestoreStarters={restoreStarters}
+            onBackup={exportBackup}
+            onRestoreBackup={(file) => void importBackup(file)}
+            lastBackupAt={lastBackupAt}
+            reminderDismissed={reminderDismissed}
+            onDismissReminder={dismissReminder}
+            onRestoreTrash={restoreTrash}
+            onDeleteTrashForever={deleteTrashForever}
+            persistent={persistent}
             theme={theme}
             onToggleTheme={() => setTheme((t) => (t === "dark" ? "light" : "dark"))}
-            persistent={persistent}
           />
-        </Suspense>
-      )}
+        ) : (
+          <Suspense fallback={<BootShell line="Opening the cutting room" />}>
+            <Editor
+              key={current.id}
+              project={current}
+              onCommit={editorCommit}
+              resolve={resolve}
+              assets={assets}
+              onAddAsset={addAsset}
+              onBack={() => navigate({ name: "gallery" })}
+              onDelete={() => deleteProject(current.id)}
+              saveStatus={saveStatus}
+              theme={theme}
+              onToggleTheme={() => setTheme((t) => (t === "dark" ? "light" : "dark"))}
+              persistent={persistent}
+            />
+          </Suspense>
+        )}
+      </Suspense>
 
       {warning && !dismissed && (
         <div className="storage-banner" role="status">

@@ -1,4 +1,4 @@
-import { useId, type JSX } from "react";
+import { useId, useMemo, type JSX } from "react";
 import { renderFrameArt, type AssetResolver, type Primitive } from "../render/primitives";
 import { frameArtToSvg } from "../render/svg";
 import type { Frame } from "../model/types";
@@ -109,7 +109,7 @@ export interface FrameArtViewProps {
  */
 export function FrameArtView({ frame, aspect, resolve, title }: FrameArtViewProps): JSX.Element {
   const uid = useId().replace(/[^a-zA-Z0-9-]/g, "");
-  const art = renderFrameArt(frame, aspect, 1000, resolve);
+  const art = useMemo(() => renderFrameArt(frame, aspect, 1000, resolve), [frame, aspect, resolve]);
   return (
     <svg
       viewBox={`0 0 ${art.width} ${art.height}`}
@@ -140,7 +140,7 @@ export interface FrameImageViewProps {
  * image, so its text is not part of the button's visible label.
  */
 export function FrameImageView({ frame, aspect, resolve, width = 1000 }: FrameImageViewProps): JSX.Element {
-  const svg = frameArtToSvg(renderFrameArt(frame, aspect, width, resolve));
+  const svg = useMemo(() => frameArtToSvg(renderFrameArt(frame, aspect, width, resolve)), [frame, aspect, width, resolve]);
   return (
     <img
       src={`data:image/svg+xml;charset=utf-8,${encodeURIComponent(svg)}`}
