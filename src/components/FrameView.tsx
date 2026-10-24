@@ -1,5 +1,6 @@
 import { useId, type JSX } from "react";
 import { renderFrameArt, type AssetResolver, type Primitive } from "../render/primitives";
+import { frameArtToSvg } from "../render/svg";
 import type { Frame } from "../model/types";
 
 /** Map a computed primitive to live SVG elements (stage, thumbs, preview). */
@@ -124,5 +125,28 @@ export function FrameArtView({ frame, aspect, resolve, title }: FrameArtViewProp
         <PrimitiveNode key={i} p={p} uid={uid} index={i} />
       ))}
     </svg>
+  );
+}
+
+export interface FrameImageViewProps {
+  frame: Frame;
+  aspect: string;
+  resolve: AssetResolver;
+  width?: number;
+}
+
+/**
+ * Image-backed thumbnail for buttons and cards. The SVG is rendered as an
+ * image, so its text is not part of the button's visible label.
+ */
+export function FrameImageView({ frame, aspect, resolve, width = 1000 }: FrameImageViewProps): JSX.Element {
+  const svg = frameArtToSvg(renderFrameArt(frame, aspect, width, resolve));
+  return (
+    <img
+      src={`data:image/svg+xml;charset=utf-8,${encodeURIComponent(svg)}`}
+      alt=""
+      aria-hidden="true"
+      style={{ display: "block", width: "100%", height: "100%", objectFit: "contain" }}
+    />
   );
 }

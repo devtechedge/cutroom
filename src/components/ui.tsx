@@ -1,4 +1,4 @@
-import { useEffect, useId, useRef, useState, type ReactNode } from "react";
+import { useCallback, useEffect, useId, useRef, useState, type ReactNode } from "react";
 import { createPortal } from "react-dom";
 import { Icon } from "./Icon";
 
@@ -145,21 +145,47 @@ export function Menu({
   onClose,
   align = "left",
   label,
+  id,
 }: {
   items: MenuItem[];
-  onClose: () => void;
+  onClose: (restoreFocus: boolean) => void;
   align?: "left" | "right";
   label?: string;
+  id?: string;
 }): ReactNode {
   const ref = useRef<HTMLDivElement>(null);
   useEffect(() => {
-    const first = ref.current?.querySelector<HTMLElement>("button:not([disabled])");
+    const first = ref.current?.querySelector<HTMLElement>('button[role="menuitem"]:not([disabled])');
     first?.focus();
     const onDown = (e: PointerEvent): void => {
-      if (ref.current && !ref.current.contains(e.target as Node)) onClose();
+      if (ref.current && !ref.current.contains(e.target as Node)) onClose(false);
     };
     const onKey = (e: KeyboardEvent): void => {
-      if (e.key === "Escape") onClose();
+      if (!ref.current) return;
+      const nodes = [...ref.current.querySelectorAll<HTMLElement>('button[role="menuitem"]:not([disabled])')];
+      if (e.key === "Escape") {
+        e.stopPropagation();
+        onClose(true);
+        return;
+      }
+      if (e.key === "Tab") {
+        e.preventDefault();
+        e.stopPropagation();
+        onClose(true);
+        return;
+      }
+      if (!["ArrowDown", "ArrowUp", "Home", "End"].includes(e.key) || nodes.length === 0) return;
+      e.preventDefault();
+      const current = nodes.indexOf(document.activeElement as HTMLElement);
+      const next =
+        e.key === "Home"
+          ? 0
+          : e.key === "End"
+            ? nodes.length - 1
+            : e.key === "ArrowDown"
+              ? (current + 1) % nodes.length
+              : (current - 1 + nodes.length) % nodes.length;
+      nodes[next]?.focus();
     };
     document.addEventListener("pointerdown", onDown, true);
     document.addEventListener("keydown", onKey, true);
@@ -169,7 +195,7 @@ export function Menu({
     };
   }, [onClose]);
   return (
-    <div className="menu" ref={ref} role="menu" aria-label={label} style={align === "right" ? { right: 0 } : { left: 0 }}>
+    <div id={id} className="menu" ref={ref} role="menu" aria-label={label} style={align === "right" ? { right: 0 } : { left: 0 }}>
       {label && <div className="menu-label">{label}</div>}
       {items.map((item, i) => (
         <div key={i}>
@@ -180,7 +206,7 @@ export function Menu({
             className={item.danger ? "danger" : undefined}
             disabled={item.disabled}
             onClick={() => {
-              onClose();
+              onClose(false);
               item.onSelect?.();
             }}
           >
@@ -193,23 +219,43 @@ export function Menu({
   );
 }
 
-export function MenuButton({ icon, label, items, align }: { icon: ReactNode; label: string; items: MenuItem[]; align?: "left" | "right" }): ReactNode {
+export function MenuButton({
+  icon,
+  label = "",
+  ariaLabel,
+  items,
+  align,
+}: {
+  icon: ReactNode;
+  label?: string;
+  ariaLabel?: string;
+  items: MenuItem[];
+  align?: "left" | "right";
+}): ReactNode {
   const [open, setOpen] = useState(false);
+  const triggerRef = useRef<HTMLButtonElement>(null);
+  const menuId = useId();
+  const close = useCallback((restoreFocus: boolean): void => {
+    setOpen(false);
+    if (restoreFocus) requestAnimationFrame(() => triggerRef.current?.focus());
+  }, []);
   return (
     <span style={{ position: "relative", display: "inline-flex" }}>
       <button
+        ref={triggerRef}
         type="button"
         className="icon-btn"
         aria-haspopup="menu"
         aria-expanded={open}
-        aria-label={label}
+        aria-controls={open ? menuId : undefined}
+        aria-label={ariaLabel ?? label}
         data-pressed={open}
         onClick={() => setOpen((v) => !v)}
       >
         {icon}
         {label ? <span className="hide-mobile">{label}</span> : null}
       </button>
-      {open && <Menu items={items} onClose={() => setOpen(false)} align={align} />}
+      {open && <Menu id={menuId} items={items} onClose={close} align={align} />}
     </span>
   );
 }

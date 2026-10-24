@@ -181,7 +181,7 @@ export function Preview({ resolve, onClose }: PreviewProps): JSX.Element {
             <Icon name="close" />
           </button>
         </div>
-        <div className="preview-stage scroll-hover">
+        <div className="preview-stage scroll-hover" tabIndex={0} role="region" aria-label="Preview stage">
           <div className="preview-frame-holder" ref={holderRef} style={{ width: Math.round(artWidth), height: Math.round(artHeight) }}>
             <FrameArtView frame={frame} aspect={sb.aspect} resolve={resolve} title={`Preview frame ${frameNumber(index)}`} />
             {overlay && (

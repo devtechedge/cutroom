@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState, type JSX } from "react";
+import { useCallback, useEffect, useId, useRef, useState, type JSX } from "react";
 import { useEditor, EditorProvider } from "../state/editor";
 import * as ops from "../model/ops";
 import { newImageObject, newShapeObject, newTextObject, relayoutForAspect } from "../model/defaults";
@@ -64,7 +64,14 @@ function EditorInner({ resolve, assets, onAddAsset, onBack, onDelete, saveStatus
   const [zoom, setZoom] = useState(1);
   const [exportMenu, setExportMenu] = useState(false);
   const [exporting, setExporting] = useState(false);
+  const exportMenuId = useId();
+  const exportTriggerRef = useRef<HTMLButtonElement>(null);
   const toastTimer = useRef<number | undefined>(undefined);
+
+  const closeExportMenu = useCallback((restoreFocus: boolean): void => {
+    setExportMenu(false);
+    if (restoreFocus) requestAnimationFrame(() => exportTriggerRef.current?.focus());
+  }, []);
 
   const showToast = useCallback((msg: string) => {
     setToast(msg);
@@ -187,7 +194,8 @@ function EditorInner({ resolve, assets, onAddAsset, onBack, onDelete, saveStatus
   };
 
   return (
-    <div className="editor">
+    <main className="editor">
+      <h1 className="visually-hidden">{sb.title || "Untitled board"}</h1>
       <header className="app-header">
         <button type="button" className="icon-btn" onClick={onBack} aria-label="Back to gallery" title="Back to gallery">
           <Icon name="move-left" />
@@ -212,12 +220,23 @@ function EditorInner({ resolve, assets, onAddAsset, onBack, onDelete, saveStatus
           <Icon name="redo" />
         </button>
         <span style={{ position: "relative", display: "inline-flex" }}>
-          <button type="button" className="btn small" aria-haspopup="menu" aria-expanded={exportMenu} data-pressed={exportMenu} disabled={exporting} onClick={() => setExportMenu((v) => !v)}>
+          <button
+            ref={exportTriggerRef}
+            type="button"
+            className="btn small"
+            aria-haspopup="menu"
+            aria-expanded={exportMenu}
+            aria-controls={exportMenu ? exportMenuId : undefined}
+            data-pressed={exportMenu}
+            disabled={exporting}
+            onClick={() => setExportMenu((v) => !v)}
+          >
             <Icon name="download" size={14} />
             <span className="hide-mobile">Export</span>
           </button>
           {exportMenu && (
             <Menu
+              id={exportMenuId}
               align="right"
               label="Export"
               items={[
@@ -226,7 +245,7 @@ function EditorInner({ resolve, assets, onAddAsset, onBack, onDelete, saveStatus
                 { label: `Current frame (PNG)`, disabled: !frame, onSelect: () => void runExport("frame-png") },
                 { label: "Project JSON", separatorBefore: true, onSelect: () => void runExport("json") },
               ]}
-              onClose={() => setExportMenu(false)}
+              onClose={closeExportMenu}
             />
           )}
         </span>
@@ -237,6 +256,7 @@ function EditorInner({ resolve, assets, onAddAsset, onBack, onDelete, saveStatus
         <MenuButton
           icon={<Icon name="sliders" />}
           label=""
+          ariaLabel="Board menu"
           align="right"
           items={[
             { label: "Board settings", onSelect: () => setBoardDialog(true) },
@@ -381,7 +401,7 @@ function EditorInner({ resolve, assets, onAddAsset, onBack, onDelete, saveStatus
 
       <Toast message={toast} />
       <LiveStatus message={object ? `Selected ${object.kind}` : frame ? `Frame ${frameNumber(frameIndex)} of ${sb.frames.length}` : ""} />
-    </div>
+    </main>
   );
 }
 

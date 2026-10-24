@@ -54,6 +54,23 @@ test.describe("responsive", () => {
     await expect(page.getByRole("heading", { level: 1 })).toBeVisible();
   });
 
+  test("menus support arrow keys and return focus", async ({ page }) => {
+    await page.goto("/");
+    const trigger = page.getByRole("button", { name: "Board actions" }).first();
+    await trigger.click();
+    await expect(page.getByRole("menu")).toBeVisible();
+    await expect(page.getByRole("menuitem", { name: "Rename" })).toBeFocused();
+    await page.keyboard.press("ArrowDown");
+    await expect(page.getByRole("menuitem", { name: "Duplicate" })).toBeFocused();
+    await page.keyboard.press("Escape");
+    await expect(page.getByRole("menu")).toHaveCount(0);
+    await expect(trigger).toBeFocused();
+    await trigger.click();
+    await page.keyboard.press("Tab");
+    await expect(page.getByRole("menu")).toHaveCount(0);
+    await expect(trigger).toBeFocused();
+  });
+
   test("theme choice persists across reload", async ({ page }) => {
     await page.goto("/");
     await page.getByRole("button", { name: "Switch to light theme" }).click();

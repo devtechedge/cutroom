@@ -3,7 +3,7 @@ import type { AssetResolver } from "../render/primitives";
 import type { Storyboard } from "../model/types";
 import { ASPECT_VALUE } from "../model/geometry";
 import { formatWhen } from "../lib/format";
-import { FrameArtView } from "./FrameView";
+import { FrameImageView } from "./FrameView";
 import { Icon } from "./Icon";
 import { ConfirmDialog, MenuButton } from "./ui";
 
@@ -54,8 +54,8 @@ function BoardCard({
         onClick={onOpen}
         aria-label={`Open board ${project.title}`}
       >
-        <span className="thumb-art">
-          {firstFrame && <FrameArtView frame={firstFrame} aspect={project.aspect} resolve={resolve} />}
+        <span className="thumb-art" aria-hidden="true">
+          {firstFrame && <FrameImageView frame={firstFrame} aspect={project.aspect} resolve={resolve} />}
         </span>
         <span className="thumb-open-hint" aria-hidden="true">
           Open board
@@ -84,9 +84,9 @@ function BoardCard({
             }}
           />
         ) : (
-          <h3 className="board-card-title" style={{ margin: 0 }}>
+          <h2 className="board-card-title" style={{ margin: 0 }}>
             {project.title}
-          </h3>
+          </h2>
         )}
         <div className="board-card-meta">
           {project.aspect} · {project.frames.length} frame{project.frames.length === 1 ? "" : "s"} · edited {formatWhen(project.updatedAt)}
@@ -102,6 +102,7 @@ function BoardCard({
         <MenuButton
           icon={<Icon name="sliders" />}
           label=""
+          ariaLabel="Board actions"
           align="right"
           items={[
             { label: "Rename", onSelect: () => setEditing(true) },
