@@ -77,6 +77,10 @@ function EditorInner({ resolve, onAddAsset, onBack, onDelete, saveStatus, theme,
       const target = e.target as HTMLElement;
       const typing = target instanceof HTMLInputElement || target instanceof HTMLTextAreaElement || target instanceof HTMLSelectElement || target.isContentEditable;
       const mod = e.ctrlKey || e.metaKey;
+      if (e.key === "Escape" && inspectorOpen) {
+        setInspectorOpen(false);
+        return;
+      }
       if (mod && e.key.toLowerCase() === "z" && !typing) {
         e.preventDefault();
         if (e.shiftKey) ed.redo();
@@ -95,7 +99,7 @@ function EditorInner({ resolve, onAddAsset, onBack, onDelete, saveStatus, theme,
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [ed]);
+  }, [ed, inspectorOpen]);
 
   const addObject = (obj: FrameObject, label: string): void => {
     if (!frame) return;
@@ -216,9 +220,9 @@ function EditorInner({ resolve, onAddAsset, onBack, onDelete, saveStatus, theme,
               align="right"
               label="Export"
               items={[
-                { label: "Contact sheet — PNG", onSelect: () => void runExport("sheet-png") },
-                { label: "Contact sheet — SVG", onSelect: () => void runExport("sheet-svg") },
-                { label: `Current frame — PNG`, disabled: !frame, onSelect: () => void runExport("frame-png") },
+                { label: "Contact sheet (PNG)", onSelect: () => void runExport("sheet-png") },
+                { label: "Contact sheet (SVG)", onSelect: () => void runExport("sheet-svg") },
+                { label: `Current frame (PNG)`, disabled: !frame, onSelect: () => void runExport("frame-png") },
                 { label: "Project JSON", separatorBefore: true, onSelect: () => void runExport("json") },
               ]}
               onClose={() => setExportMenu(false)}
