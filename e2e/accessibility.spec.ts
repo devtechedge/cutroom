@@ -24,6 +24,18 @@ test("mobile gallery and editor pass axe", async ({ page }) => {
   expect(await seriousViolations(page), "mobile editor").toEqual([]);
 });
 
+test("welcome and legal pages pass axe", async ({ page }) => {
+  await page.goto("/#/welcome");
+  await expect(page.getByRole("heading", { level: 1 })).toBeVisible();
+  expect(await seriousViolations(page), "welcome").toEqual([]);
+  await page.goto("/#/privacy");
+  await expect(page.getByRole("heading", { level: 1 })).toBeVisible();
+  expect(await seriousViolations(page), "privacy").toEqual([]);
+  await page.goto("/#/contact");
+  await expect(page.getByRole("heading", { level: 1 })).toBeVisible();
+  expect(await seriousViolations(page), "contact").toEqual([]);
+});
+
 test("editor, menus, dialogs, and preview pass axe", async ({ page }) => {
   await page.goto("/");
   await page.getByRole("button", { name: /^Open board / }).first().click();

@@ -3,30 +3,11 @@ import { loadImages, paintArt } from "../render/canvas";
 import { FONT_STACKS } from "../render/fonts";
 import { renderFrameArt, type AssetResolver, type Primitive } from "../render/primitives";
 import { primitiveToSvg } from "../render/svg";
-import { layoutContactSheet, SHEET, type SheetPage } from "./contactsheet";
+import { layoutContactSheet, SHEET, sheetInk, type SheetPage } from "./contactsheet";
 import { downloadBlob, downloadText, slugify } from "../lib/download";
 import { MAX_PROJECT_BYTES, parseProjectFile, serializeProjectFile, type ParsedProject } from "./projectfile";
 import { frameNumber } from "../model/geometry";
 import type { Asset, Frame, Storyboard } from "../model/types";
-
-function luminance(hex: string): number {
-  const r = parseInt(hex.slice(1, 3), 16) / 255;
-  const g = parseInt(hex.slice(3, 5), 16) / 255;
-  const b = parseInt(hex.slice(5, 7), 16) / 255;
-  return 0.2126 * r + 0.7152 * g + 0.0722 * b;
-}
-
-export interface SheetInk {
-  ink: string;
-  muted: string;
-  rule: string;
-}
-
-export function sheetInk(paper: string): SheetInk {
-  return luminance(paper) > 0.45
-    ? { ink: "#201d18", muted: "#6b6557", rule: "#c9c2b0" }
-    : { ink: "#f2ede3", muted: "#a49c8b", rule: "#4a453c" };
-}
 
 function truncate(s: string, max: number): string {
   return s.length > max ? `${s.slice(0, max - 1)}\u2026` : s;

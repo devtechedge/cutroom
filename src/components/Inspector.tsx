@@ -106,6 +106,7 @@ const KIND_META: Record<FrameObject["kind"], { icon: IconName; label: string }> 
 export function Inspector({ open, onAddAsset, onToast }: InspectorProps): JSX.Element {
   const ed = useEditor();
   const { sb, frame, object, frameIndex } = ed;
+  const multi = ed.objectIds.length > 1;
   if (!frame) {
     return <aside className="inspector" data-open={open} aria-label="Inspector" />;
   }
@@ -116,6 +117,16 @@ export function Inspector({ open, onAddAsset, onToast }: InspectorProps): JSX.El
   const runObject = (label: string, patch: Partial<FrameObject>): void => {
     if (!object) return;
     ed.run(label, (sbNow) => ops.updateObject(sbNow, frame.id, object.id, patch));
+  };
+
+  const duplicateSelection = (): void => {
+    const copies = ops.cloneObjects(ed.objects);
+    if (copies.length === 0) return;
+    ed.run("duplicate-objects", (sbNow) => ops.addObjects(sbNow, frame.id, copies), { objectIds: copies.map((o) => o.id) });
+  };
+
+  const deleteSelection = (): void => {
+    ed.run("remove-objects", (sbNow) => ops.removeObjects(sbNow, frame.id, ed.objectIds), { objectIds: [] });
   };
 
   const pickImage = (replaceObjectId?: string): void => {
@@ -149,7 +160,28 @@ export function Inspector({ open, onAddAsset, onToast }: InspectorProps): JSX.El
   return (
     <aside className="inspector scroll-hover" data-open={open} aria-label="Inspector">
       <div className="inspector-inner">
-        {object ? (
+        {multi ? (
+          <>
+            <h2>Selection</h2>
+            <p className="selection-copy">
+              {ed.objectIds.length} objects selected. Drag any selected object to move the group, or use the arrow keys. Styling applies to one object at a
+              time.
+            </p>
+            <div className="row">
+              <button type="button" className="btn small" onClick={duplicateSelection}>
+                <Icon name="layers" size={13} />
+                Duplicate
+              </button>
+              <span style={{ flex: 1 }} />
+              <button type="button" className="btn small danger" onClick={deleteSelection}>
+                <Icon name="trash" size={13} />
+                Delete all
+              </button>
+            </div>
+            <hr className="rule" />
+            <p className="selection-copy">Select a single object to edit its size, color and content.</p>
+          </>
+        ) : object ? (
           <>
             <h2>Object</h2>
             <div className="obj-kind">

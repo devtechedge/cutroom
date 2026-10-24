@@ -1,7 +1,7 @@
 {
   "name": "cutroom",
   "private": true,
-  "version": "1.1.0",
+  "version": "1.2.0",
   "type": "module",
   "description": "CUTROOM: a cinematic storyboard and visual narrative studio for frames, rhythm, and presentation-ready exports.",
   "scripts": {

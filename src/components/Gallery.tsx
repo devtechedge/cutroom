@@ -3,12 +3,15 @@ import type { AssetResolver } from "../render/primitives";
 import type { Storyboard } from "../model/types";
 import { ASPECT_VALUE } from "../model/geometry";
 import { formatWhen } from "../lib/format";
+import type { TrashRecord } from "../persist/store";
 import { FrameImageView } from "./FrameView";
 import { Icon } from "./Icon";
+import { SiteFooter } from "./InfoPages";
 import { ConfirmDialog, MenuButton } from "./ui";
 
 export interface GalleryProps {
   projects: Storyboard[];
+  trash: TrashRecord[];
   resolve: AssetResolver;
   onCreate: () => void;
   onOpen: (id: string) => void;
@@ -18,6 +21,13 @@ export interface GalleryProps {
   onDelete: (id: string) => void;
   onImport: (file: File) => void;
   onRestoreStarters: () => void;
+  onBackup: () => void;
+  onRestoreBackup: (file: File) => void;
+  lastBackupAt: number | null;
+  reminderDismissed: boolean;
+  onDismissReminder: () => void;
+  onRestoreTrash: (id: string) => void;
+  onDeleteTrashForever: (id: string) => void;
   persistent: boolean;
   theme: "dark" | "light";
   onToggleTheme: () => void;
@@ -118,8 +128,8 @@ function BoardCard({
           title="Delete this board?"
           body={
             <>
-              “{project.title}” and its {project.frames.length} frame{project.frames.length === 1 ? "" : "s"} will be removed from this browser. This cannot be
-              undone.
+              “{project.title}” and its {project.frames.length} frame{project.frames.length === 1 ? "" : "s"} will move to Recently deleted. Restore it from the gallery
+              within 30 days; delete it forever to free its images now.
             </>
           }
           confirmLabel="Delete board"
@@ -132,10 +142,50 @@ function BoardCard({
   );
 }
 
+function TrashRow({
+  record,
+  onRestore,
+  onDeleteForever,
+}: {
+  record: TrashRecord;
+  onRestore: () => void;
+  onDeleteForever: () => void;
+}): ReactNode {
+  const [confirm, setConfirm] = useState(false);
+  return (
+    <div className="trash-row">
+      <div className="trash-copy">
+        <strong>{record.storyboard.title}</strong>
+        <span className="mono">
+          {record.storyboard.frames.length} frame{record.storyboard.frames.length === 1 ? "" : "s"} · deleted {formatWhen(record.deletedAt)}
+        </span>
+      </div>
+      <button type="button" className="btn small" onClick={onRestore}>
+        Restore
+      </button>
+      <button type="button" className="btn small danger" onClick={() => setConfirm(true)}>
+        Delete forever
+      </button>
+      {confirm && (
+        <ConfirmDialog
+          title="Delete forever?"
+          body={`“${record.storyboard.title}” and its images will be removed from this browser. This cannot be undone.`}
+          confirmLabel="Delete forever"
+          danger
+          onConfirm={onDeleteForever}
+          onClose={() => setConfirm(false)}
+        />
+      )}
+    </div>
+  );
+}
+
 export function Gallery(props: GalleryProps): ReactNode {
   const fileRef = useRef<HTMLInputElement>(null);
+  const importMode = useRef<"project" | "backup">("project");
   const {
     projects,
+    trash,
     resolve,
     onCreate,
     onOpen,
@@ -145,12 +195,20 @@ export function Gallery(props: GalleryProps): ReactNode {
     onDelete,
     onImport,
     onRestoreStarters,
+    onBackup,
+    onRestoreBackup,
+    lastBackupAt,
+    reminderDismissed,
+    onDismissReminder,
+    onRestoreTrash,
+    onDeleteTrashForever,
     persistent,
     theme,
     onToggleTheme,
   } = props;
 
   const sorted = [...projects].sort((a, b) => b.updatedAt - a.updatedAt);
+  const sortedTrash = [...trash].sort((a, b) => b.deletedAt - a.deletedAt);
 
   return (
     <div className="scroll-hover" style={{ minHeight: "100%", overflowY: "auto" }}>
@@ -160,6 +218,9 @@ export function Gallery(props: GalleryProps): ReactNode {
           CUTROOM
         </span>
         <span className="header-spacer" />
+        <a className="btn small" href="#/welcome">
+          Why CUTROOM
+        </a>
         <button type="button" className="icon-btn" onClick={onToggleTheme} aria-label={theme === "dark" ? "Switch to light theme" : "Switch to dark theme"}>
           <Icon name={theme === "dark" ? "sun" : "moon"} />
         </button>
@@ -175,9 +236,30 @@ export function Gallery(props: GalleryProps): ReactNode {
             </p>
           </div>
           <div className="gallery-actions">
-            <button type="button" className="btn" onClick={() => fileRef.current?.click()}>
+            <button
+              type="button"
+              className="btn"
+              onClick={() => {
+                importMode.current = "project";
+                fileRef.current?.click();
+              }}
+            >
               <Icon name="upload" />
               Import JSON
+            </button>
+            <button
+              type="button"
+              className="btn"
+              onClick={() => {
+                importMode.current = "backup";
+                fileRef.current?.click();
+              }}
+            >
+              Restore backup
+            </button>
+            <button type="button" className="btn" onClick={onBackup} disabled={projects.length === 0}>
+              <Icon name="download" />
+              Back up all
             </button>
             <button type="button" className="btn primary" onClick={onCreate}>
               <Icon name="plus" />
@@ -189,7 +271,28 @@ export function Gallery(props: GalleryProps): ReactNode {
           <span>{projects.length} board{projects.length === 1 ? "" : "s"}</span>
           <span aria-hidden="true">·</span>
           <span>{persistent ? "autosaves to this browser, nothing leaves your machine" : "storage unavailable, this session is memory-only"}</span>
+          {lastBackupAt && (
+            <>
+              <span aria-hidden="true">·</span>
+              <span>last backup {formatWhen(lastBackupAt)}</span>
+            </>
+          )}
         </div>
+
+        {projects.length > 0 && !lastBackupAt && !reminderDismissed && (
+          <aside className="backup-nudge" aria-label="Backup reminder">
+            <Icon name="warning" />
+            <span style={{ flex: 1 }}>
+              These boards live only in this browser. Download one backup file you can restore on another machine or after clearing site data.
+            </span>
+            <button type="button" className="btn small primary" onClick={onBackup}>
+              Download backup
+            </button>
+            <button type="button" className="btn small" onClick={onDismissReminder}>
+              Not now
+            </button>
+          </aside>
+        )}
 
         {sorted.length === 0 ? (
           <div className="empty-state">
@@ -220,7 +323,30 @@ export function Gallery(props: GalleryProps): ReactNode {
             ))}
           </div>
         )}
+
+        {sortedTrash.length > 0 && (
+          <section className="trash-section" aria-labelledby="trash-heading">
+            <div className="trash-head">
+              <h2 id="trash-heading">Recently deleted</h2>
+              <span className="mono">{sortedTrash.length} kept for 30 days</span>
+            </div>
+            <p className="trash-note">
+              Restoring a board also restores its images. After 30 days, deleted boards and their unreferenced images are cleaned up at startup.
+            </p>
+            <div className="trash-list">
+              {sortedTrash.map((record) => (
+                <TrashRow
+                  key={record.storyboard.id}
+                  record={record}
+                  onRestore={() => onRestoreTrash(record.storyboard.id)}
+                  onDeleteForever={() => onDeleteTrashForever(record.storyboard.id)}
+                />
+              ))}
+            </div>
+          </section>
+        )}
       </main>
+      <SiteFooter />
 
       <input
         ref={fileRef}
@@ -231,7 +357,10 @@ export function Gallery(props: GalleryProps): ReactNode {
         tabIndex={-1}
         onChange={(e) => {
           const file = e.target.files?.[0];
-          if (file) onImport(file);
+          if (file) {
+            if (importMode.current === "backup") onRestoreBackup(file);
+            else onImport(file);
+          }
           e.target.value = "";
         }}
       />

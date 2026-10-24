@@ -329,6 +329,106 @@ test.describe("CUTROOM journey", () => {
     await page.getByRole("button", { name: "Close dialog" }).click();
   });
 
+  test("multi-select copies, pastes and duplicates a group", async ({ page }) => {
+    await openFirstBoard(page);
+    const stage = page.getByLabel(/Stage: frame \d+ of \d+/);
+    await stage.focus();
+    const hits = page.locator(".stage-object-hit");
+    const total = await hits.count();
+    await page.keyboard.press("Control+a");
+    await expect(page.locator('.stage-object-hit[data-selected="true"]')).toHaveCount(total);
+    await expect(page.getByRole("toolbar", { name: "Selection actions" })).toBeVisible();
+
+    const first = hits.first();
+    await first.click({ modifiers: ["Shift"] });
+    await expect(page.locator('.stage-object-hit[data-selected="true"]')).toHaveCount(total - 1);
+    await first.click({ modifiers: ["Shift"] });
+    await expect(page.locator('.stage-object-hit[data-selected="true"]')).toHaveCount(total);
+
+    await stage.focus();
+    await page.keyboard.press("Control+c");
+    await page.keyboard.press("Control+v");
+    await expect(hits).toHaveCount(total * 2);
+    await expect(page.locator('.stage-object-hit[data-selected="true"]')).toHaveCount(total);
+
+    await page.keyboard.press("Control+d");
+    await expect(hits).toHaveCount(total * 3);
+    await page.keyboard.press("Delete");
+    await expect(hits).toHaveCount(total * 2);
+  });
+
+  test("print route renders the contact sheet", async ({ page }) => {
+    await openFirstBoard(page);
+    await page.getByRole("button", { name: "Export" }).click();
+    await page.getByRole("menuitem", { name: "Print / save as PDF" }).click();
+    await expect(page).toHaveURL(/#\/print\//);
+    await expect(page.getByLabel("Contact sheet page 1 of 1")).toBeVisible();
+    await expect(page.locator(".print-cell")).not.toHaveCount(0);
+    await expect(page.getByRole("button", { name: "Print / save as PDF" })).toBeVisible();
+    await page.emulateMedia({ media: "print" });
+    await expect(page.locator(".print-toolbar")).toBeHidden();
+    await page.emulateMedia({ media: "screen" });
+    await page.getByRole("button", { name: "Back to board" }).click();
+    await expect(page.getByLabel(/Stage: frame \d+ of \d+/)).toBeVisible();
+  });
+
+  test("deleted boards survive reload in the trash and restore", async ({ page }) => {
+    await expect(page.locator("article.board-card")).toHaveCount(4);
+    const card = page.locator("article.board-card").first();
+    const title = (await card.getByRole("heading", { level: 2 }).textContent()) ?? "";
+    await card.getByRole("button", { name: "Board actions" }).click();
+    await page.getByRole("menuitem", { name: "Delete board" }).click();
+    await page.getByRole("alertdialog").getByRole("button", { name: "Delete board" }).click();
+    await expect(page.locator("article.board-card")).toHaveCount(3);
+    await expect(page.getByRole("heading", { name: "Recently deleted" })).toBeVisible();
+
+    await page.reload();
+    await expect(page.locator("article.board-card")).toHaveCount(3);
+    await expect(page.getByRole("heading", { name: "Recently deleted" })).toBeVisible();
+    await page.getByRole("button", { name: "Restore", exact: true }).click();
+    await expect(page.locator("article.board-card")).toHaveCount(4);
+    await expect(page.locator("article.board-card").filter({ hasText: title }).first()).toBeVisible();
+    await expect(page.getByRole("heading", { name: "Recently deleted" })).toHaveCount(0);
+  });
+
+  test("backup downloads every board and restores after deletion", async ({ page }) => {
+    const downloadPromise = page.waitForEvent("download");
+    await page.getByRole("button", { name: "Back up all" }).click();
+    const download = await downloadPromise;
+    expect(download.suggestedFilename()).toMatch(/^cutroom-backup-\d{4}-\d{2}-\d{2}\.json$/);
+    const backup = JSON.parse(fs.readFileSync(await download.path(), "utf8")) as {
+      format: string;
+      projects: { storyboard: { title: string } }[];
+    };
+    expect(backup.format).toBe("cutroom-backup");
+    expect(backup.projects).toHaveLength(4);
+
+    const card = page.locator("article.board-card").first();
+    await card.getByRole("button", { name: "Board actions" }).click();
+    await page.getByRole("menuitem", { name: "Delete board" }).click();
+    await page.getByRole("alertdialog").getByRole("button", { name: "Delete board" }).click();
+    await expect(page.locator("article.board-card")).toHaveCount(3);
+
+    await page.getByRole("button", { name: "Restore backup" }).click();
+    await page.locator('input[type="file"][accept*="json"]').setInputFiles(await download.path());
+    await expect(page.locator("article.board-card")).toHaveCount(7);
+  });
+
+  test("welcome, legal and contact pages are reachable", async ({ page }) => {
+    await page.goto("/#/welcome");
+    await expect(page.getByRole("heading", { level: 1 })).toContainText("Storyboard the cut before you shoot it.");
+    await expect(page.getByRole("heading", { name: "Made for the people who plan the frame" })).toBeVisible();
+    await page.getByRole("link", { name: "Privacy", exact: true }).click();
+    await expect(page.getByRole("heading", { level: 1 })).toContainText("Your boards stay in your browser.");
+    await page.getByRole("link", { name: "Terms", exact: true }).click();
+    await expect(page.getByRole("heading", { level: 1 })).toContainText("A free tool");
+    await page.getByRole("link", { name: "Contact", exact: true }).click();
+    await expect(page.getByRole("heading", { level: 1 })).toContainText("Tell us what broke");
+    await page.goto("/#/welcome");
+    await page.getByRole("button", { name: "Open a demo board" }).click();
+    await expect(page.getByLabel(/Stage: frame \d+ of \d+/)).toBeVisible();
+  });
+
   test("no console errors across the core loop", async ({ page }) => {
     await openFirstBoard(page);
     await page.getByRole("button", { name: "Shape", exact: true }).click();

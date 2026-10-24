@@ -1,11 +1,19 @@
-import { ASSETS, PROJECTS, openSimpleDB, type SimpleDB } from "./db";
+import { ASSETS, PROJECTS, TRASH, openSimpleDB, type SimpleDB } from "./db";
 import { sanitizeAsset, sanitizeStoryboard } from "../model/validate";
 import type { Asset, Storyboard } from "../model/types";
+
+export const TRASH_TTL_MS = 30 * 24 * 60 * 60 * 1000;
+
+export interface TrashRecord {
+  storyboard: Storyboard;
+  deletedAt: number;
+}
 
 export interface Library {
   db: SimpleDB;
   projects: Storyboard[];
   assets: Map<string, Asset>;
+  trash: TrashRecord[];
   /** false when persistence is memory-only for this session. */
   persistent: boolean;
   /** Storage error worth telling the user about (quota, blocked, corrupt). */
@@ -23,6 +31,7 @@ export async function loadLibrary(): Promise<Library> {
     warning = err instanceof Error ? `Storage unavailable (${err.message}); working in memory only.` : "Storage unavailable; working in memory only.";
   });
   const projects: Storyboard[] = [];
+  const trash: TrashRecord[] = [];
   const assets = new Map<string, Asset>();
   try {
     const rawProjects = await db.getAll(PROJECTS);
@@ -39,13 +48,25 @@ export async function loadLibrary(): Promise<Library> {
       const asset = sanitizeAsset(raw);
       if (asset) assets.set(asset.id, asset);
     }
+    const rawTrash = await db.getAll(TRASH);
+    for (const raw of rawTrash) {
+      try {
+        if (typeof raw !== "object" || raw === null) throw new Error("invalid trash record");
+        const record = raw as { storyboard?: unknown; deletedAt?: unknown };
+        const { value } = sanitizeStoryboard(record.storyboard);
+        const deletedAt = typeof record.deletedAt === "number" && Number.isFinite(record.deletedAt) ? record.deletedAt : 0;
+        if (deletedAt > 0) trash.push({ storyboard: value, deletedAt });
+      } catch {
+        warning = warning ?? "One deleted board could not be read and was skipped.";
+      }
+    }
     if (db.mode === "memory" && warning === null) {
       warning = "Storage is unavailable in this browser; changes last for this session only.";
     }
   } catch (err) {
     warning = warning ?? (err instanceof Error ? `Storage error: ${err.message}` : "Storage error.");
   }
-  return { db, projects, assets, persistent: db.mode === "idb", warning };
+  return { db, projects, assets, trash, persistent: db.mode === "idb", warning };
 }
 
 export async function saveProject(db: SimpleDB, sb: Storyboard): Promise<void> {
@@ -62,6 +83,14 @@ export async function saveAssetRecord(db: SimpleDB, asset: Asset): Promise<void>
 
 export async function deleteAssetRecord(db: SimpleDB, id: string): Promise<void> {
   await db.delete(ASSETS, id);
+}
+
+export async function saveTrashRecord(db: SimpleDB, record: TrashRecord): Promise<void> {
+  await db.put(TRASH, record.storyboard.id, record);
+}
+
+export async function deleteTrashRecord(db: SimpleDB, id: string): Promise<void> {
+  await db.delete(TRASH, id);
 }
 
 export interface StorageEstimateInfo {

@@ -1,5 +1,25 @@
 # Changelog
 
+## v1.2.0 (2026-10-24)
+
+### Added
+
+- Multi-select on the stage with shift-click, marquee selection, group move, group nudge and batch delete.
+- Copy, paste and duplicate for selected objects, with undo history kept as one group action.
+- Print route at `#/print/<id>` for a print-ready contact sheet and PDF through the browser print dialog.
+- Whole-library backup and restore as a validated JSON file.
+- A 30-day Recently deleted bin with restore and permanent delete.
+- A backup reminder when boards exist and no backup has been downloaded.
+- Public pages for welcome, privacy, terms and contact, plus a product and roadmap doc set.
+- A custom domain migration plan that accounts for origin-scoped IndexedDB.
+- Linux pixel baselines for the stage, print sheet and welcome page, with a workflow to refresh them.
+
+### Changed
+
+- Board deletion moves boards to Recently deleted instead of removing them immediately.
+- Storage moved to IndexedDB version 2 with a trash store. Existing databases upgrade in place.
+- The gallery footer links to the public pages and the source repository.
+
 ## v1.1.0 (2026-10-24)
 
 ### Added
