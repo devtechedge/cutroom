@@ -146,7 +146,7 @@ test.describe("CUTROOM journey", () => {
   test("missing board routes fall back to the gallery", async ({ page }) => {
     await page.goto("/#/board/missing-board");
     await expect(page.getByRole("heading", { level: 1 })).toBeVisible();
-    expect(page.url()).not.toContain("missing-board");
+    await expect.poll(() => page.url()).not.toContain("missing-board");
   });
 
   test("a second tab warns when the same board is open", async ({ page, context }) => {
