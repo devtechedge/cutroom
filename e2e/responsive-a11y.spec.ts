@@ -31,6 +31,7 @@ test.describe("responsive", () => {
     const box = (await aside.boundingBox()) as { x: number; width: number };
     expect(box.x + box.width).toBeGreaterThan(700);
     await page.keyboard.press("Escape");
+    await expect(aside).toHaveAttribute("data-open", "false");
   });
 
   test("theme choice persists across reload", async ({ page }) => {
@@ -39,6 +40,15 @@ test.describe("responsive", () => {
     await expect(page.locator("html")).toHaveAttribute("data-theme", "light");
     await page.reload();
     await expect(page.locator("html")).toHaveAttribute("data-theme", "light");
+  });
+
+  test("editor header toggles the theme directly", async ({ page }) => {
+    await page.goto("/");
+    await page.getByRole("button", { name: /^Open board / }).first().click();
+    await page.getByRole("button", { name: "Switch to light theme" }).click();
+    await expect(page.locator("html")).toHaveAttribute("data-theme", "light");
+    await page.getByRole("button", { name: "Switch to dark theme" }).click();
+    await expect(page.locator("html")).toHaveAttribute("data-theme", "dark");
   });
 });
 
