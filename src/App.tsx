@@ -58,7 +58,7 @@ export default function App(): JSX.Element {
   const [saveStatus, setSaveStatus] = useState<SaveStatus>({ state: "saved", at: null });
   const [showNew, setShowNew] = useState(false);
   const [toast, setToast] = useState<string | null>(null);
-  const [importIssues, setImportIssues] = useState<{ title: string; issues: string[] } | null>(null);
+  const [importIssues, setImportIssues] = useState<{ title: string; issues: string[]; failed: boolean } | null>(null);
   const toastTimer = useRef<number | undefined>(undefined);
   const saveTimer = useRef<number | undefined>(undefined);
   const pendingSaves = useRef<Map<string, Storyboard>>(new Map());
@@ -91,6 +91,7 @@ export default function App(): JSX.Element {
     void (async () => {
       const lib = await loadLibrary();
       if (!life.alive) return;
+      const hadProjects = lib.projects.length > 0;
       let list = lib.projects;
       let seeded = false;
       if (list.length === 0 && !hasSeeded()) {
@@ -98,7 +99,7 @@ export default function App(): JSX.Element {
         list = buildStarterLibrary();
         seeded = true;
       }
-      if (list.length > 0 && lib.persistent) markSeeded();
+      if (hadProjects && lib.persistent) markSeeded();
       setDb(lib.db);
       setPersistent(lib.persistent);
       setWarning(lib.warning);
@@ -284,13 +285,13 @@ export default function App(): JSX.Element {
       upsertProject(imported);
       if (db) void saveProject(db, imported).catch(() => undefined);
       if (fixes.length > 0) {
-        setImportIssues({ title: imported.title, issues: fixes.map((f) => `${f.path}: ${f.message}`) });
+        setImportIssues({ title: imported.title, issues: fixes.map((f) => `${f.path}: ${f.message}`), failed: false });
       } else {
         showToast(`Imported “${imported.title}”.`);
       }
       setRoute({ name: "editor", id: imported.id });
     } catch (err) {
-      setImportIssues({ title: file.name, issues: [err instanceof Error ? err.message : "The file could not be read as a CUTROOM project."] });
+      setImportIssues({ title: file.name, issues: [err instanceof Error ? err.message : "The file could not be read as a CUTROOM project."], failed: true });
     }
   };
 
@@ -373,11 +374,11 @@ export default function App(): JSX.Element {
       {showNew && <NewProjectDialog onClose={() => setShowNew(false)} onCreate={createProject} />}
 
       {importIssues && (
-        <Dialog title={importIssues.issues.length === 1 && /not valid JSON|does not contain|Unsupported project version/i.test(importIssues.issues[0]) ? "Import failed" : "Imported with fixes"} onClose={() => setImportIssues(null)}>
+        <Dialog title={importIssues.failed ? "Import failed" : "Imported with fixes"} onClose={() => setImportIssues(null)}>
           <p style={{ margin: 0 }}>
             <strong>{importIssues.title}</strong>
           </p>
-          {importIssues.issues.length === 1 && /not valid JSON|does not contain|Unsupported project version/i.test(importIssues.issues[0]) ? (
+          {importIssues.failed ? (
             <p style={{ margin: 0 }}>{importIssues.issues[0]}</p>
           ) : (
             <ul className="issue-list">
