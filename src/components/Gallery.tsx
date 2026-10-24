@@ -17,6 +17,7 @@ export interface GalleryProps {
   onExportJson: (id: string) => void;
   onDelete: (id: string) => void;
   onImport: (file: File) => void;
+  onRestoreStarters: () => void;
   persistent: boolean;
   theme: "dark" | "light";
   onToggleTheme: () => void;
@@ -143,6 +144,7 @@ export function Gallery(props: GalleryProps): ReactNode {
     onExportJson,
     onDelete,
     onImport,
+    onRestoreStarters,
     persistent,
     theme,
     onToggleTheme,
@@ -192,10 +194,15 @@ export function Gallery(props: GalleryProps): ReactNode {
         {sorted.length === 0 ? (
           <div className="empty-state">
             <p style={{ marginTop: 0 }}>No boards yet.</p>
-            <button type="button" className="btn primary" onClick={onCreate}>
-              <Icon name="plus" />
-              New storyboard
-            </button>
+            <div style={{ display: "flex", flexWrap: "wrap", gap: 8, justifyContent: "center" }}>
+              <button type="button" className="btn primary" onClick={onCreate}>
+                <Icon name="plus" />
+                New storyboard
+              </button>
+              <button type="button" className="btn" onClick={onRestoreStarters}>
+                Restore starter boards
+              </button>
+            </div>
           </div>
         ) : (
           <div className="board-grid">

@@ -26,6 +26,23 @@ test.describe("CUTROOM journey", () => {
     expect(consoleErrors).toEqual([]);
   });
 
+  test("deleting every board stays empty after reload and can restore starters", async ({ page }) => {
+    await expect(page.locator("article.board-card")).toHaveCount(4);
+    for (let remaining = 3; remaining >= 0; remaining -= 1) {
+      const card = page.locator("article.board-card").first();
+      await card.getByRole("button", { name: "Board actions" }).click();
+      await page.getByRole("menuitem", { name: "Delete board" }).click();
+      await page.getByRole("alertdialog").getByRole("button", { name: "Delete board" }).click();
+      await expect(page.locator("article.board-card")).toHaveCount(remaining);
+    }
+    await expect(page.getByText("No boards yet.")).toBeVisible();
+    await page.reload();
+    await expect(page.getByText("No boards yet.")).toBeVisible();
+    await expect(page.locator("article.board-card")).toHaveCount(0);
+    await page.getByRole("button", { name: "Restore starter boards" }).click();
+    await expect(page.locator("article.board-card")).toHaveCount(4);
+  });
+
   test("create a blank board and add a shape", async ({ page }) => {
     await page.getByRole("button", { name: "New storyboard" }).click();
     await page.getByRole("button", { name: "Create board" }).click();

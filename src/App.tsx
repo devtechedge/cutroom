@@ -18,6 +18,23 @@ type Theme = "dark" | "light";
 type Route = { name: "gallery" } | { name: "editor"; id: string };
 
 const AUTOSAVE_MS = 600;
+const SEEDED_KEY = "cutroom-seeded";
+
+function hasSeeded(): boolean {
+  try {
+    return localStorage.getItem(SEEDED_KEY) === "1";
+  } catch {
+    return false;
+  }
+}
+
+function markSeeded(): void {
+  try {
+    localStorage.setItem(SEEDED_KEY, "1");
+  } catch {
+    // seeding stays best-effort when storage is blocked
+  }
+}
 
 function loadTheme(): Theme {
   try {
@@ -76,11 +93,12 @@ export default function App(): JSX.Element {
       if (!life.alive) return;
       let list = lib.projects;
       let seeded = false;
-      if (list.length === 0) {
+      if (list.length === 0 && !hasSeeded()) {
         const { buildStarterLibrary } = await import("./model/starters");
         list = buildStarterLibrary();
         seeded = true;
       }
+      if (list.length > 0 && lib.persistent) markSeeded();
       setDb(lib.db);
       setPersistent(lib.persistent);
       setWarning(lib.warning);
@@ -88,7 +106,11 @@ export default function App(): JSX.Element {
       setProjects(list);
       setBooted(true);
       if (seeded) {
-        for (const sb of list) void saveProject(lib.db, sb);
+        void Promise.all(list.map((sb) => saveProject(lib.db, sb)))
+          .then(() => {
+            if (lib.persistent) markSeeded();
+          })
+          .catch(() => undefined);
       }
       // drop assets no project references anymore
       try {
@@ -226,6 +248,17 @@ export default function App(): JSX.Element {
     showToast(`Duplicated as “${copy.title}”.`);
   };
 
+  const restoreStarters = useCallback(async (): Promise<void> => {
+    const { buildStarterLibrary } = await import("./model/starters");
+    const starters = buildStarterLibrary();
+    for (const starter of starters) {
+      upsertProject(starter);
+      if (db) void saveProject(db, starter).catch(() => undefined);
+    }
+    if (persistent) markSeeded();
+    showToast("Starter boards restored.");
+  }, [db, persistent, showToast, upsertProject]);
+
   const importProject = async (file: File): Promise<void> => {
     try {
       const { sb, assets: importedAssets, fixes } = await importStoryboardFile(file);
@@ -305,6 +338,7 @@ export default function App(): JSX.Element {
           }}
           onDelete={deleteProject}
           onImport={(file) => void importProject(file)}
+          onRestoreStarters={() => void restoreStarters()}
           persistent={persistent}
           theme={theme}
           onToggleTheme={() => setTheme((t) => (t === "dark" ? "light" : "dark"))}
