@@ -56,27 +56,61 @@ export function moveFrame(sb: Storyboard, from: number, to: number): { sb: Story
 }
 
 export function addObject(sb: Storyboard, frameId: string, obj: FrameObject): Storyboard {
-  return touch(sb, sb.frames.map((f) => (f.id === frameId ? { ...f, objects: [...f.objects, obj] } : f)));
+  return addObjects(sb, frameId, [obj]);
+}
+
+export function addObjects(sb: Storyboard, frameId: string, objects: FrameObject[]): Storyboard {
+  if (objects.length === 0) return sb;
+  return touch(sb, sb.frames.map((f) => (f.id === frameId ? { ...f, objects: [...f.objects, ...objects] } : f)));
 }
 
 export function updateObject(sb: Storyboard, frameId: string, objectId: string, patch: Partial<FrameObject>): Storyboard {
+  return updateObjects(sb, frameId, { [objectId]: patch });
+}
+
+export function updateObjects(sb: Storyboard, frameId: string, patches: Record<string, Partial<FrameObject>>): Storyboard {
+  if (Object.keys(patches).length === 0) return sb;
   return touch(
     sb,
     sb.frames.map((f) => {
       if (f.id !== frameId) return f;
       return {
         ...f,
-        objects: f.objects.map((o) => (o.id === objectId ? fitObjectToFrame({ ...o, ...patch } as FrameObject, sb.aspect) : o)),
+        objects: f.objects.map((o) => (o.id in patches ? fitObjectToFrame({ ...o, ...patches[o.id] } as FrameObject, sb.aspect) : o)),
       };
     }),
   );
 }
 
 export function removeObject(sb: Storyboard, frameId: string, objectId: string): Storyboard {
+  return removeObjects(sb, frameId, [objectId]);
+}
+
+export function removeObjects(sb: Storyboard, frameId: string, objectIds: readonly string[]): Storyboard {
+  if (objectIds.length === 0) return sb;
+  const removed = new Set(objectIds);
   return touch(
     sb,
-    sb.frames.map((f) => (f.id === frameId ? { ...f, objects: f.objects.filter((o) => o.id !== objectId) } : f)),
+    sb.frames.map((f) => (f.id === frameId ? { ...f, objects: f.objects.filter((o) => !removed.has(o.id)) } : f)),
   );
+}
+
+export function cloneObjects(objects: readonly FrameObject[], offset = 20): FrameObject[] {
+  return objects.map((o) => ({
+    ...structuredClone(o),
+    id: newId(),
+    x: o.x + offset,
+    y: o.y + offset,
+  }));
+}
+
+export function duplicateObjects(sb: Storyboard, frameId: string, objectIds: readonly string[], offset = 20): { sb: Storyboard; ids: string[] } {
+  const frame = sb.frames.find((f) => f.id === frameId);
+  if (!frame) return { sb, ids: [] };
+  const selected = frame.objects.filter((o) => objectIds.includes(o.id));
+  if (selected.length === 0) return { sb, ids: [] };
+  const copies = cloneObjects(selected, offset);
+  return { sb: addObjects(sb, frameId, copies), ids: copies.map((o) => o.id) };
 }
 
 export type ZOrder = "front" | "back" | "forward" | "backward";

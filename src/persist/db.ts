@@ -44,9 +44,10 @@ function memoryDB(): SimpleDB {
 }
 
 export const DB_NAME = "cutroom";
-export const DB_VERSION = 1;
+export const DB_VERSION = 2;
 export const PROJECTS = "projects";
 export const ASSETS = "assets";
+export const TRASH = "trash";
 
 /** Opens IndexedDB; resolves to the memory fallback when IDB is blocked. */
 export function openSimpleDB(onError?: (err: unknown) => void): Promise<SimpleDB> {
@@ -72,6 +73,7 @@ export function openSimpleDB(onError?: (err: unknown) => void): Promise<SimpleDB
         const db = req.result;
         if (!db.objectStoreNames.contains(PROJECTS)) db.createObjectStore(PROJECTS);
         if (!db.objectStoreNames.contains(ASSETS)) db.createObjectStore(ASSETS);
+        if (!db.objectStoreNames.contains(TRASH)) db.createObjectStore(TRASH);
       };
       req.onsuccess = () => {
         const db = req.result;

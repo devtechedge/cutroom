@@ -35,6 +35,7 @@ export interface SheetCell {
 export interface SheetPage {
   width: number;
   height: number;
+  cols: number;
   title: string;
   meta: string;
   brief: string;
@@ -44,6 +45,26 @@ export interface SheetPage {
   pageIndex: number;
   pageCount: number;
   frameCount: number;
+}
+
+export interface SheetInk {
+  ink: string;
+  muted: string;
+  rule: string;
+}
+
+function luminance(hex: string): number {
+  const r = parseInt(hex.slice(1, 3), 16) / 255;
+  const g = parseInt(hex.slice(3, 5), 16) / 255;
+  const b = parseInt(hex.slice(5, 7), 16) / 255;
+  return 0.2126 * r + 0.7152 * g + 0.0722 * b;
+}
+
+/** Ink colors that stay legible on the board's chosen paper. */
+export function sheetInk(paper: string): SheetInk {
+  return luminance(paper) > 0.45
+    ? { ink: "#201d18", muted: "#6b6557", rule: "#c9c2b0" }
+    : { ink: "#f2ede3", muted: "#a49c8b", rule: "#4a453c" };
 }
 
 /** Greedy word wrap against a measured-mono width; ends with an ellipsis. */
@@ -115,6 +136,7 @@ export function layoutContactSheet(sb: Storyboard, resolve: AssetResolver): Shee
     pages.push({
       width: SHEET.pageWidth,
       height,
+      cols,
       title: sb.title,
       meta,
       brief: sb.brief.trim(),

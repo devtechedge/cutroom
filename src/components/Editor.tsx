@@ -68,6 +68,7 @@ function EditorInner({ resolve, assets, onAddAsset, onBack, onDelete, saveStatus
   const exportMenuId = useId();
   const exportTriggerRef = useRef<HTMLButtonElement>(null);
   const toastTimer = useRef<number | undefined>(undefined);
+  const clipboard = useRef<FrameObject[]>([]);
 
   const closeExportMenu = useCallback((restoreFocus: boolean): void => {
     setExportMenu(false);
@@ -80,7 +81,20 @@ function EditorInner({ resolve, assets, onAddAsset, onBack, onDelete, saveStatus
     toastTimer.current = window.setTimeout(() => setToast(null), 3800);
   }, []);
 
-  // global shortcuts: undo/redo and help, skipped while typing
+  const copySelection = (): void => {
+    if (ed.objects.length === 0) return;
+    clipboard.current = ed.objects.map((o) => structuredClone(o));
+    showToast(`${clipboard.current.length} object${clipboard.current.length === 1 ? "" : "s"} copied.`);
+  };
+
+  const pasteCopies = (source: FrameObject[], label: string): void => {
+    if (!frame || source.length === 0) return;
+    const copies = ops.cloneObjects(source);
+    ed.run(label, (sbNow) => ops.addObjects(sbNow, frame.id, copies), { objectIds: copies.map((o) => o.id) });
+    showToast(`${copies.length} object${copies.length === 1 ? "" : "s"} added.`);
+  };
+
+  // global shortcuts: undo/redo, object clipboard, selection and help, skipped while typing
   useEffect(() => {
     const onKey = (e: KeyboardEvent): void => {
       const target = e.target as HTMLElement;
@@ -101,6 +115,30 @@ function EditorInner({ resolve, assets, onAddAsset, onBack, onDelete, saveStatus
         ed.redo();
         return;
       }
+      if (mod && e.key.toLowerCase() === "a" && !typing && frame) {
+        e.preventDefault();
+        ed.selectMany(frame.objects.map((o) => o.id));
+        return;
+      }
+      if (mod && e.key.toLowerCase() === "c" && !typing) {
+        e.preventDefault();
+        copySelection();
+        return;
+      }
+      if (mod && e.key.toLowerCase() === "v" && !typing) {
+        e.preventDefault();
+        pasteCopies(clipboard.current, "paste-objects");
+        return;
+      }
+      if (mod && e.key.toLowerCase() === "d" && !typing) {
+        e.preventDefault();
+        pasteCopies(ed.objects, "duplicate-objects");
+        return;
+      }
+      if (e.key === "Escape" && !typing) {
+        ed.clearSelection();
+        return;
+      }
       if (e.key === "?" && !typing) {
         e.preventDefault();
         setShortcuts(true);
@@ -108,7 +146,9 @@ function EditorInner({ resolve, assets, onAddAsset, onBack, onDelete, saveStatus
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [ed, inspectorOpen]);
+    // copySelection and pasteCopies read the latest editor state through this effect
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [ed, inspectorOpen, showToast]);
 
   const addObject = (obj: FrameObject, label: string): void => {
     if (!frame) return;
@@ -247,7 +287,17 @@ function EditorInner({ resolve, assets, onAddAsset, onBack, onDelete, saveStatus
                 { label: "Contact sheet (PNG)", onSelect: () => void runExport("sheet-png") },
                 { label: "Contact sheet (SVG)", onSelect: () => void runExport("sheet-svg") },
                 { label: `Current frame (PNG)`, disabled: !frame, onSelect: () => void runExport("frame-png") },
-                { label: "Project JSON", separatorBefore: true, onSelect: () => void runExport("json") },
+                {
+                  label: "Print / save as PDF",
+                  separatorBefore: true,
+                  onSelect: () => {
+                    const url = `${window.location.pathname}${window.location.search}#/print/${encodeURIComponent(sb.id)}`;
+                    const opened = window.open(url, "_blank");
+                    if (opened) opened.opener = null;
+                    else showToast("Allow pop-ups to open the print sheet, or use the browser print command.");
+                  },
+                },
+                { label: "Project JSON", onSelect: () => void runExport("json") },
               ]}
               onClose={closeExportMenu}
             />
@@ -356,8 +406,13 @@ function EditorInner({ resolve, assets, onAddAsset, onBack, onDelete, saveStatus
             <kbd>Home / End</kbd> <span>First / last frame</span>
             <kbd>Tab</kbd> <span>Reach objects on the stage</span>
             <kbd>Enter</kbd> <span>Select the focused object</span>
-            <kbd>Arrow keys</kbd> <span>Nudge the selected object (Shift = fine)</span>
-            <kbd>Delete</kbd> <span>Remove the selected object</span>
+            <kbd>Shift+click</kbd> <span>Add or remove an object from the selection</span>
+            <kbd>Drag on empty stage</kbd> <span>Marquee-select objects</span>
+            <kbd>Ctrl+A</kbd> <span>Select every object in the frame</span>
+            <kbd>Ctrl+C / Ctrl+V</kbd> <span>Copy and paste selected objects</span>
+            <kbd>Ctrl+D</kbd> <span>Duplicate selected objects</span>
+            <kbd>Arrow keys</kbd> <span>Nudge the selection (Shift = fine)</span>
+            <kbd>Delete</kbd> <span>Remove the selection</span>
             <kbd>Esc</kbd> <span>Deselect · close dialogs and preview</span>
             <kbd>Space</kbd> <span>Play / pause in preview</span>
             <kbd>?</kbd> <span>This list</span>
@@ -395,7 +450,7 @@ function EditorInner({ resolve, assets, onAddAsset, onBack, onDelete, saveStatus
       {confirmDelete && frame && (
         <ConfirmDialog
           title="Delete this board?"
-          body={`“${sb.title}” and all ${sb.frames.length} frames will be removed from this browser.`}
+          body={`“${sb.title}” and all ${sb.frames.length} frames will move to Recently deleted. Restore it from the gallery within 30 days; delete it forever there to free its images.`}
           confirmLabel="Delete board"
           danger
           onConfirm={onDelete}
@@ -404,7 +459,17 @@ function EditorInner({ resolve, assets, onAddAsset, onBack, onDelete, saveStatus
       )}
 
       <Toast message={toast} />
-      <LiveStatus message={object ? `Selected ${object.kind}` : frame ? `Frame ${frameNumber(frameIndex)} of ${sb.frames.length}` : ""} />
+      <LiveStatus
+        message={
+          ed.objectIds.length > 1
+            ? `${ed.objectIds.length} objects selected`
+            : object
+              ? `Selected ${object.kind}`
+              : frame
+                ? `Frame ${frameNumber(frameIndex)} of ${sb.frames.length}`
+                : ""
+        }
+      />
     </main>
   );
 }

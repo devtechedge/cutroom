@@ -2,40 +2,99 @@ import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState, type
 import type { Asset, Storyboard } from "./model/types";
 import { duplicateStoryboard } from "./model/ops";
 import { newId } from "./model/ids";
-import { buildStarterLibrary } from "./model/starters";
-import { estimateUsage, loadLibrary, saveAssetRecord, saveProject, deleteProjectRecord, deleteAssetRecord } from "./persist/store";
+import { buildStarterLibrary, STARTER_TEMPLATES } from "./model/starters";
+import {
+  estimateUsage,
+  loadLibrary,
+  saveAssetRecord,
+  saveProject,
+  saveTrashRecord,
+  deleteTrashRecord,
+  deleteProjectRecord,
+  deleteAssetRecord,
+  TRASH_TTL_MS,
+  type TrashRecord,
+} from "./persist/store";
 import type { SimpleDB } from "./persist/db";
 import type { AssetResolver } from "./render/primitives";
 import { exportProjectJson, importStoryboardFile } from "./export/exporters";
+import { parseBackupFile, serializeBackupFile, MAX_BACKUP_BYTES } from "./export/backup";
 import { remapAssetIds } from "./export/projectfile";
+import { downloadText } from "./lib/download";
 import { formatBytes } from "./lib/format";
 import { Gallery } from "./components/Gallery";
 import type { SaveStatus } from "./components/Editor";
 import { NewProjectDialog } from "./components/NewProjectDialog";
+import { PrintSheet } from "./components/PrintSheet";
+import { Welcome, PrivacyPage, TermsPage, ContactPage } from "./components/InfoPages";
 import { Dialog, Toast } from "./components/ui";
 import { Icon } from "./components/Icon";
 
 const Editor = lazy(() => import("./components/Editor").then((module) => ({ default: module.Editor })));
 
 type Theme = "dark" | "light";
-type Route = { name: "gallery" } | { name: "editor"; id: string };
+type InfoPage = "privacy" | "terms" | "contact";
+type Route =
+  | { name: "gallery" }
+  | { name: "editor"; id: string }
+  | { name: "print"; id: string }
+  | { name: "welcome" }
+  | { name: "info"; page: InfoPage };
 
 const AUTOSAVE_MS = 600;
 const SEEDED_KEY = "cutroom-seeded";
+const BACKUP_KEY = "cutroom-last-backup";
+const REMINDER_KEY = "cutroom-backup-reminder-dismissed";
 const GALLERY_TITLE = "CUTROOM: storyboard and visual narrative studio";
 
+function readStoredNumber(key: string): number | null {
+  try {
+    const raw = localStorage.getItem(key);
+    const value = raw ? Number(raw) : NaN;
+    return Number.isFinite(value) ? value : null;
+  } catch {
+    return null;
+  }
+}
+
+function readStoredFlag(key: string): boolean {
+  try {
+    return localStorage.getItem(key) === "1";
+  } catch {
+    return false;
+  }
+}
+
+function storeFlag(key: string, value: string): void {
+  try {
+    localStorage.setItem(key, value);
+  } catch {
+    // preference persistence is best-effort
+  }
+}
+
 function readRoute(): Route {
-  const match = /^#\/board\/([^/?#]+)/.exec(window.location.hash);
+  if (window.location.hash === "#/welcome") return { name: "welcome" };
+  if (window.location.hash === "#/privacy") return { name: "info", page: "privacy" };
+  if (window.location.hash === "#/terms") return { name: "info", page: "terms" };
+  if (window.location.hash === "#/contact") return { name: "info", page: "contact" };
+  const board = /^#\/board\/([^/?#]+)/.exec(window.location.hash);
+  const print = /^#\/print\/([^/?#]+)/.exec(window.location.hash);
+  const match = board ?? print;
   if (!match) return { name: "gallery" };
   try {
-    return { name: "editor", id: decodeURIComponent(match[1]) };
+    return { name: board ? "editor" : "print", id: decodeURIComponent(match[1]) };
   } catch {
     return { name: "gallery" };
   }
 }
 
 function hashFor(route: Route): string {
-  return route.name === "editor" ? `#/board/${encodeURIComponent(route.id)}` : "#/";
+  if (route.name === "editor") return `#/board/${encodeURIComponent(route.id)}`;
+  if (route.name === "print") return `#/print/${encodeURIComponent(route.id)}`;
+  if (route.name === "welcome") return "#/welcome";
+  if (route.name === "info") return `#/${route.page}`;
+  return "#/";
 }
 
 function BootShell({ line }: { line: string }): JSX.Element {
@@ -76,8 +135,11 @@ export default function App(): JSX.Element {
   const [theme, setTheme] = useState<Theme>(loadTheme);
   const [route, setRoute] = useState<Route>(readRoute);
   const [projects, setProjects] = useState<Storyboard[]>([]);
+  const [trash, setTrash] = useState<TrashRecord[]>([]);
   const [assets, setAssets] = useState<Map<string, Asset>>(new Map());
   const [db, setDb] = useState<SimpleDB | null>(null);
+  const [lastBackupAt, setLastBackupAt] = useState<number | null>(() => readStoredNumber(BACKUP_KEY));
+  const [reminderDismissed, setReminderDismissed] = useState(() => readStoredFlag(REMINDER_KEY));
   const [persistent, setPersistent] = useState(true);
   const [warning, setWarning] = useState<string | null>(null);
   const [dismissed, setDismissed] = useState(false);
@@ -90,6 +152,7 @@ export default function App(): JSX.Element {
   const toastTimer = useRef<number | undefined>(undefined);
   const saveTimer = useRef<number | undefined>(undefined);
   const pendingSaves = useRef<Map<string, Storyboard>>(new Map());
+  const deletedIds = useRef<Set<string>>(new Set());
   const assetsRef = useRef<Map<string, Asset>>(assets);
   useEffect(() => {
     assetsRef.current = assets;
@@ -146,24 +209,34 @@ export default function App(): JSX.Element {
           list = buildStarterLibrary();
           seeded = true;
         }
-        if (hadProjects && lib.persistent) markSeeded();
+        const now = Date.now();
+        const keptTrash = lib.trash.filter((record) => now - record.deletedAt <= TRASH_TTL_MS);
+        const expiredTrash = lib.trash.filter((record) => now - record.deletedAt > TRASH_TTL_MS);
+        if ((hadProjects || lib.trash.length > 0) && lib.persistent) markSeeded();
         setDb(lib.db);
         setPersistent(lib.persistent);
         setWarning(lib.warning);
         setAssets(lib.assets);
         setProjects(list);
+        setTrash(keptTrash);
         setBooted(true);
         if (seeded) {
           void Promise.all(list.map((sb) => saveProject(lib.db, sb)))
             .then(() => {
               if (lib.persistent) markSeeded();
+              for (const id of deletedIds.current) void deleteProjectRecord(lib.db, id).catch(() => undefined);
             })
             .catch(() => undefined);
         }
-        // drop assets no project references anymore
+        for (const record of expiredTrash) {
+          void deleteTrashRecord(lib.db, record.storyboard.id).catch(() => undefined);
+        }
+        // drop assets no active or recoverable board references anymore
         try {
           const referenced = new Set<string>();
-          for (const sb of list) for (const f of sb.frames) for (const o of f.objects) if (o.kind === "image") referenced.add(o.assetId);
+          for (const sb of [...list, ...keptTrash.map((r) => r.storyboard)]) {
+            for (const f of sb.frames) for (const o of f.objects) if (o.kind === "image") referenced.add(o.assetId);
+          }
           for (const asset of lib.assets.values()) {
             if (!referenced.has(asset.id)) {
               await deleteAssetRecord(lib.db, asset.id);
@@ -246,7 +319,10 @@ export default function App(): JSX.Element {
           return;
         }
         Promise.all(batch.map((s) => saveProject(db, s)))
-          .then(() => setSaveStatus({ state: "saved", at: Date.now() }))
+          .then(() => {
+            for (const id of deletedIds.current) void deleteProjectRecord(db, id).catch(() => undefined);
+            setSaveStatus({ state: "saved", at: Date.now() });
+          })
           .catch((err: unknown) => {
             const quota = err instanceof DOMException && (err.name === "QuotaExceededError" || err.name === "NS_ERROR_DOM_QUOTA_REACHED");
             setSaveStatus({
@@ -288,6 +364,7 @@ export default function App(): JSX.Element {
   );
 
   const createProject = (sb: Storyboard): void => {
+    deletedIds.current.delete(sb.id);
     upsertProject(sb);
     if (db) void saveProject(db, sb).catch(() => undefined);
     setShowNew(false);
@@ -295,17 +372,131 @@ export default function App(): JSX.Element {
   };
 
   const deleteProject = (id: string): void => {
+    const target = projects.find((p) => p.id === id);
+    if (!target) return;
+    const record: TrashRecord = { storyboard: target, deletedAt: Date.now() };
     setProjects((prev) => prev.filter((p) => p.id !== id));
+    setTrash((prev) => [record, ...prev.filter((r) => r.storyboard.id !== id)]);
+    deletedIds.current.add(id);
     pendingSaves.current.delete(id);
-    if (db) void deleteProjectRecord(db, id).catch(() => undefined);
+    if (persistent) markSeeded();
+    if (db) {
+      void saveTrashRecord(db, record).catch(() => showToast("The board could not be moved to Recently deleted; it is still in memory for this session."));
+      void deleteProjectRecord(db, id).catch(() => undefined);
+    }
     navigate({ name: "gallery" });
-    showToast("Board deleted. Orphaned images are cleaned up next time the app starts.");
+    showToast("Board moved to Recently deleted. Restore it from the gallery within 30 days.");
+  };
+
+  const restoreTrash = (id: string): void => {
+    const record = trash.find((r) => r.storyboard.id === id);
+    if (!record) return;
+    const board = projects.some((p) => p.id === id) ? duplicateStoryboard(record.storyboard, record.storyboard.title) : record.storyboard;
+    deletedIds.current.delete(id);
+    setTrash((prev) => prev.filter((r) => r.storyboard.id !== id));
+    upsertProject(board);
+    if (db) {
+      void deleteTrashRecord(db, id).catch(() => undefined);
+      void saveProject(db, board).catch(() => undefined);
+    }
+    showToast(`Restored “${board.title}”.`);
+  };
+
+  const deleteTrashForever = (id: string): void => {
+    const record = trash.find((r) => r.storyboard.id === id);
+    if (!record) return;
+    const remainingTrash = trash.filter((r) => r.storyboard.id !== id);
+    setTrash(remainingTrash);
+    if (db) void deleteTrashRecord(db, id).catch(() => undefined);
+    const stillUsed = new Set<string>();
+    for (const sb of [...projects, ...remainingTrash.map((r) => r.storyboard)]) {
+      for (const frame of sb.frames) for (const object of frame.objects) if (object.kind === "image") stillUsed.add(object.assetId);
+    }
+    const gone = new Set<string>();
+    for (const frame of record.storyboard.frames) {
+      for (const object of frame.objects) if (object.kind === "image" && !stillUsed.has(object.assetId)) gone.add(object.assetId);
+    }
+    if (gone.size > 0) {
+      setAssets((prev) => {
+        const next = new Map(prev);
+        for (const assetId of gone) next.delete(assetId);
+        return next;
+      });
+      if (db) for (const assetId of gone) void deleteAssetRecord(db, assetId).catch(() => undefined);
+    }
+    showToast("Board permanently deleted.");
+  };
+
+  const exportBackup = useCallback((): void => {
+    try {
+      const text = serializeBackupFile(projects, assets.values());
+      downloadText(text, `cutroom-backup-${new Date().toISOString().slice(0, 10)}.json`);
+      const now = Date.now();
+      setLastBackupAt(now);
+      storeFlag(BACKUP_KEY, String(now));
+      showToast(`Backup downloaded (${projects.length} board${projects.length === 1 ? "" : "s"}). Boards in Recently deleted are not included.`);
+    } catch (err) {
+      showToast(err instanceof Error ? err.message : "Backup failed.");
+    }
+  }, [projects, assets, showToast]);
+
+  const dismissReminder = useCallback((): void => {
+    setReminderDismissed(true);
+    storeFlag(REMINDER_KEY, "1");
+  }, []);
+
+  const importBackup = async (file: File): Promise<void> => {
+    if (file.size > MAX_BACKUP_BYTES) {
+      setImportIssues({ title: file.name, issues: ["Backup is larger than 100 MB. Import boards individually instead."], failed: true });
+      return;
+    }
+    try {
+      const parsed = parseBackupFile(JSON.parse(await file.text()));
+      const addedProjects: Storyboard[] = [];
+      const addedAssets: Asset[] = [];
+      for (const entry of parsed.projects) {
+        let board = entry.sb;
+        if (entry.assets.length > 0) {
+          const mapping = new Map<string, string>();
+          const copies = entry.assets.map((asset) => ({ ...asset, id: newId(), addedAt: Date.now() }));
+          entry.assets.forEach((asset, index) => mapping.set(asset.id, copies[index].id));
+          board = remapAssetIds(board, mapping);
+          addedAssets.push(...copies);
+        }
+        const exists = projects.some((p) => p.id === board.id) || addedProjects.some((p) => p.id === board.id);
+        const next = exists ? duplicateStoryboard(board, board.title) : board;
+        deletedIds.current.delete(next.id);
+        addedProjects.push(next);
+        if (db) void saveProject(db, next).catch(() => undefined);
+      }
+      if (addedAssets.length > 0) {
+        setAssets((prev) => {
+          const map = new Map(prev);
+          for (const asset of addedAssets) map.set(asset.id, asset);
+          return map;
+        });
+        if (db) {
+          for (const asset of addedAssets) {
+            void saveAssetRecord(db, asset).catch(() => showToast("A restored image could not be stored; it will work until this tab closes."));
+          }
+        }
+      }
+      setProjects((prev) => [...prev, ...addedProjects]);
+      if (parsed.fixes.length > 0) {
+        setImportIssues({ title: file.name, issues: parsed.fixes.map((f) => `${f.path}: ${f.message}`), failed: false });
+      } else {
+        showToast(`Restored ${addedProjects.length} board${addedProjects.length === 1 ? "" : "s"} from backup.`);
+      }
+    } catch (err) {
+      setImportIssues({ title: file.name, issues: [err instanceof Error ? err.message : "The backup could not be read."], failed: true });
+    }
   };
 
   const duplicateProject = (id: string): void => {
     const source = projects.find((p) => p.id === id);
     if (!source) return;
     const copy = duplicateStoryboard(source, `${source.title} copy`);
+    deletedIds.current.delete(copy.id);
     upsertProject(copy);
     if (db) void saveProject(db, copy).catch(() => undefined);
     showToast(`Duplicated as “${copy.title}”.`);
@@ -314,12 +505,26 @@ export default function App(): JSX.Element {
   const restoreStarters = useCallback((): void => {
     const starters = buildStarterLibrary();
     for (const starter of starters) {
+      deletedIds.current.delete(starter.id);
       upsertProject(starter);
       if (db) void saveProject(db, starter).catch(() => undefined);
     }
     if (persistent) markSeeded();
     showToast("Starter boards restored.");
   }, [db, persistent, showToast, upsertProject]);
+
+  const openDemo = useCallback((): void => {
+    const existing = projects.find((project) => project.title === "Night Shift");
+    if (existing) {
+      navigate({ name: "editor", id: existing.id });
+      return;
+    }
+    const demo = STARTER_TEMPLATES[0].build();
+    deletedIds.current.delete(demo.id);
+    upsertProject(demo);
+    if (db) void saveProject(db, demo).catch(() => undefined);
+    navigate({ name: "editor", id: demo.id });
+  }, [db, navigate, projects, upsertProject]);
 
   const importProject = async (file: File): Promise<void> => {
     try {
@@ -343,6 +548,7 @@ export default function App(): JSX.Element {
       }
       const exists = projects.some((p) => p.id === board.id);
       const imported = exists ? { ...board, id: `${board.id}-${Math.random().toString(36).slice(2, 6)}` } : board;
+      deletedIds.current.delete(imported.id);
       upsertProject(imported);
       if (db) void saveProject(db, imported).catch(() => undefined);
       if (fixes.length > 0) {
@@ -367,15 +573,25 @@ export default function App(): JSX.Element {
     [assets, showToast],
   );
 
-  const current = route.name === "editor" ? projects.find((p) => p.id === route.id) : undefined;
+  const current = route.name === "editor" || route.name === "print" ? projects.find((p) => p.id === route.id) : undefined;
 
   useEffect(() => {
-    document.title = route.name === "editor" && current ? `${current.title} - CUTROOM` : GALLERY_TITLE;
-  }, [current, route.name]);
+    if (route.name === "welcome") {
+      document.title = "CUTROOM: storyboard and visual narrative studio";
+    } else if (route.name === "info") {
+      document.title = `${route.page === "privacy" ? "Privacy" : route.page === "terms" ? "Terms" : "Contact"} - CUTROOM`;
+    } else if (!current) {
+      document.title = GALLERY_TITLE;
+    } else if (route.name === "print") {
+      document.title = `${current.title} contact sheet - CUTROOM`;
+    } else {
+      document.title = `${current.title} - CUTROOM`;
+    }
+  }, [current, route.name, route]);
 
   useEffect(() => {
     if (!booted) return;
-    if (route.name === "editor" && !current) {
+    if ((route.name === "editor" || route.name === "print") && !current) {
       window.history.replaceState(null, "", "#/");
     }
   }, [booted, current, route.name]);
@@ -415,9 +631,22 @@ export default function App(): JSX.Element {
 
   return (
     <>
-      {route.name === "gallery" || !current ? (
+      {route.name === "welcome" ? (
+        <Welcome theme={theme} onToggleTheme={() => setTheme((t) => (t === "dark" ? "light" : "dark"))} onOpenDemo={openDemo} />
+      ) : route.name === "info" ? (
+        route.page === "privacy" ? (
+          <PrivacyPage theme={theme} onToggleTheme={() => setTheme((t) => (t === "dark" ? "light" : "dark"))} />
+        ) : route.page === "terms" ? (
+          <TermsPage theme={theme} onToggleTheme={() => setTheme((t) => (t === "dark" ? "light" : "dark"))} />
+        ) : (
+          <ContactPage theme={theme} onToggleTheme={() => setTheme((t) => (t === "dark" ? "light" : "dark"))} />
+        )
+      ) : route.name === "print" && current ? (
+        <PrintSheet project={current} resolve={resolve} onBack={() => navigate({ name: "editor", id: current.id })} />
+      ) : route.name === "gallery" || !current ? (
         <Gallery
           projects={projects}
+          trash={trash}
           resolve={resolve}
           onCreate={() => setShowNew(true)}
           onOpen={(id) => navigate({ name: "editor", id })}
@@ -433,6 +662,13 @@ export default function App(): JSX.Element {
           onDelete={deleteProject}
           onImport={(file) => void importProject(file)}
           onRestoreStarters={restoreStarters}
+          onBackup={exportBackup}
+          onRestoreBackup={(file) => void importBackup(file)}
+          lastBackupAt={lastBackupAt}
+          reminderDismissed={reminderDismissed}
+          onDismissReminder={dismissReminder}
+          onRestoreTrash={restoreTrash}
+          onDeleteTrashForever={deleteTrashForever}
           persistent={persistent}
           theme={theme}
           onToggleTheme={() => setTheme((t) => (t === "dark" ? "light" : "dark"))}
