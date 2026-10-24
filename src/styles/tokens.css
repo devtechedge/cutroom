@@ -1,0 +1,50 @@
+:root {
+  /* dark cutting-room chrome (default) */
+  --bg: #1d1b18;
+  --bg-raised: #262320;
+  --bg-overlay: #2e2a26;
+  --bg-inset: #171513;
+  --ink: #f2ede3;
+  --ink-mid: #b9b1a1;
+  --ink-low: #847d6d;
+  --line: #3a362f;
+  --line-strong: #4c473d;
+  --paper: #f5f1e6;
+  --paper-deep: #e9e3d3;
+  --signal: #d7f04c;
+  --signal-strong: #c7e433;
+  --signal-ink: #1c2005;
+  --signal-dim: rgba(215, 240, 76, 0.16);
+  --mark: #e8a13d;
+  --danger: #e06c4f;
+  --danger-dim: rgba(224, 108, 79, 0.14);
+  --focus: #d7f04c;
+  --shadow: 0 12px 32px rgba(0, 0, 0, 0.45);
+  --stage-grid: rgba(242, 237, 227, 0.07);
+  color-scheme: dark;
+}
+
+[data-theme="light"] {
+  --bg: #efe9db;
+  --bg-raised: #f7f3e8;
+  --bg-overlay: #fdfaf1;
+  --bg-inset: #e4ddcb;
+  --ink: #201d18;
+  --ink-mid: #5d5748;
+  --ink-low: #8d8672;
+  --line: #d5cdb9;
+  --line-strong: #b8b09a;
+  --paper: #f5f1e6;
+  --paper-deep: #e9e3d3;
+  --signal: #b7d434;
+  --signal-strong: #a3c21c;
+  --signal-ink: #1c2005;
+  --signal-dim: rgba(140, 170, 20, 0.18);
+  --mark: #b06f10;
+  --danger: #b3401f;
+  --danger-dim: rgba(179, 64, 31, 0.12);
+  --focus: #201d18;
+  --shadow: 0 12px 32px rgba(32, 29, 24, 0.18);
+  --stage-grid: rgba(32, 29, 24, 0.08);
+  color-scheme: light;
+}

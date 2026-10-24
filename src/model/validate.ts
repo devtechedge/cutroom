@@ -20,6 +20,7 @@ import {
   SHOT_TYPES,
   TRANSITIONS,
   type AspectRatio,
+  type Asset,
   type Caption,
   type Frame,
   type FrameObject,
@@ -182,9 +183,8 @@ export function sanitizeStoryboard(input: unknown): SanitizeResult {
   if (input.schemaVersion === undefined) {
     fixes.push({ path: "schemaVersion", message: "missing; treated as 1" });
   } else if (input.schemaVersion !== SCHEMA_VERSION) {
-    throw new Error(
-      `Unsupported project version ${String(input.schemaVersion)}; this build reads version ${SCHEMA_VERSION}.`,
-    );
+    const shown = typeof input.schemaVersion === "number" ? input.schemaVersion : "unknown";
+    throw new Error(`Unsupported project version ${shown}; this build reads version ${SCHEMA_VERSION}.`);
   }
   const aspect = pick<AspectRatio>(input.aspect, ASPECT_RATIOS, "16:9");
   if (input.aspect !== aspect) {
@@ -231,7 +231,7 @@ export function sanitizeStoryboard(input: unknown): SanitizeResult {
 }
 
 /** Validate an uploaded asset record coming back out of storage. */
-export function sanitizeAsset(input: unknown): import("./types").Asset | null {
+export function sanitizeAsset(input: unknown): Asset | null {
   if (!isRecord(input)) return null;
   const dataUrl = input.dataUrl;
   if (typeof dataUrl !== "string" || !dataUrl.startsWith("data:image/")) return null;

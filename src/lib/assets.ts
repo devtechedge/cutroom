@@ -20,7 +20,11 @@ export function fileToAsset(file: File): Promise<Asset> {
     const reader = new FileReader();
     reader.onerror = () => reject(new UploadError(`Could not read "${file.name}".`));
     reader.onload = () => {
-      const dataUrl = String(reader.result);
+      if (typeof reader.result !== "string" || reader.result.length === 0) {
+        reject(new UploadError(`Could not read "${file.name}".`));
+        return;
+      }
+      const dataUrl = reader.result;
       const img = new Image();
       img.onerror = () => reject(new UploadError(`"${file.name}" could not be decoded as an image.`));
       img.onload = () => {

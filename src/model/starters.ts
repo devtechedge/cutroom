@@ -24,7 +24,7 @@ function txt(p: TP): FrameObject {
   return newTextObject({ color: INK, ...p });
 }
 
-function frame(p: Parameters<typeof newFrame>[0] & { caption: string; notes?: string }): Frame {
+function frame(p: Omit<Partial<Frame>, "caption"> & { caption: string; notes?: string }): Frame {
   const { caption, notes, ...rest } = p;
   return newFrame({ ...rest, caption: { text: caption, visible: true }, notes: notes ?? "" });
 }

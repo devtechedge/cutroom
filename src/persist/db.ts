@@ -23,20 +23,22 @@ function memoryDB(): SimpleDB {
   };
   return {
     mode: "memory",
-    async get(s, key) {
-      return store(s).get(key);
+    get<T = unknown>(s: string, key: string): Promise<T | undefined> {
+      return Promise.resolve(store(s).get(key) as T | undefined);
     },
-    async put(s, key, value) {
+    put(s: string, key: string, value: unknown): Promise<void> {
       store(s).set(key, value);
+      return Promise.resolve();
     },
-    async delete(s, key) {
+    delete(s: string, key: string): Promise<void> {
       store(s).delete(key);
+      return Promise.resolve();
     },
-    async getAll(s) {
-      return [...store(s).values()];
+    getAll<T = unknown>(s: string): Promise<T[]> {
+      return Promise.resolve([...store(s).values()] as T[]);
     },
-    async getAllKeys(s) {
-      return [...store(s).keys()];
+    getAllKeys(s: string): Promise<string[]> {
+      return Promise.resolve([...store(s).keys()]);
     },
   };
 }
@@ -79,31 +81,31 @@ export function openSimpleDB(onError?: (err: unknown) => void): Promise<SimpleDB
             new Promise((res, rej) => {
               const r = db.transaction(s, "readonly").objectStore(s).get(key);
               r.onsuccess = () => res(r.result as never);
-              r.onerror = () => rej(r.error);
+              r.onerror = () => rej(r.error ?? new Error("IndexedDB read failed"));
             }),
           put: (s, key, value) =>
             new Promise((res, rej) => {
               const r = db.transaction(s, "readwrite").objectStore(s).put(value, key);
               r.onsuccess = () => res();
-              r.onerror = () => rej(r.error);
+              r.onerror = () => rej(r.error ?? new Error("IndexedDB write failed"));
             }),
           delete: (s, key) =>
             new Promise((res, rej) => {
               const r = db.transaction(s, "readwrite").objectStore(s).delete(key);
               r.onsuccess = () => res();
-              r.onerror = () => rej(r.error);
+              r.onerror = () => rej(r.error ?? new Error("IndexedDB delete failed"));
             }),
           getAll: (s) =>
             new Promise((res, rej) => {
               const r = db.transaction(s, "readonly").objectStore(s).getAll();
               r.onsuccess = () => res(r.result as never[]);
-              r.onerror = () => rej(r.error);
+              r.onerror = () => rej(r.error ?? new Error("IndexedDB read failed"));
             }),
           getAllKeys: (s) =>
             new Promise((res, rej) => {
               const r = db.transaction(s, "readonly").objectStore(s).getAllKeys();
               r.onsuccess = () => res(r.result as string[]);
-              r.onerror = () => rej(r.error);
+              r.onerror = () => rej(r.error ?? new Error("IndexedDB read failed"));
             }),
         };
         if (!settled) {

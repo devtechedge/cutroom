@@ -1,6 +1,6 @@
 import { ASPECT_VALUE, FRAME_UNITS } from "../model/geometry";
 import { FONT_STACKS } from "./fonts";
-import type { Frame, FrameObject, ImageObject, ShapeObject, TextObject } from "../model/types";
+import type { Frame, ImageObject, ShapeObject, TextObject } from "../model/types";
 
 export interface ResolvedImage {
   dataUrl: string;
@@ -90,8 +90,9 @@ export interface FrameArt {
   hasMissing: boolean;
 }
 
-export function frameAspectValue(aspect: Frame["id"] extends never ? never : string): number {
-  return ASPECT_VALUE[aspect as keyof typeof ASPECT_VALUE] ?? 16 / 9;
+export function frameAspectValue(aspect: string): number {
+  const known = ASPECT_VALUE as Record<string, number | undefined>;
+  return known[aspect] ?? 16 / 9;
 }
 
 function shapeToPrimitives(o: ShapeObject, s: number, height: number): Primitive[] {

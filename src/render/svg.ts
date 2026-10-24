@@ -8,7 +8,8 @@ function n(v: number): string {
   return String(Math.round(v * 100) / 100);
 }
 
-function primitiveToSvg(p: Primitive, clipId: string | null): { defs: string; body: string } {
+/** Shared SVG emitter; also used by the contact-sheet exporter. */
+export function primitiveToSvg(p: Primitive, clipId: string | null): { defs: string; body: string } {
   switch (p.type) {
     case "rect": {
       const fill = p.fill ? ` fill="${p.fill}"` : ' fill="none"';

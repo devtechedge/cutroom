@@ -1,6 +1,6 @@
 import { loadImages, paintArt } from "../render/canvas";
 import { FONT_STACKS } from "../render/fonts";
-import { renderFrameArt, frameArtToSvg, type AssetResolver } from "../render/primitives";
+import { renderFrameArt, type AssetResolver, type Primitive } from "../render/primitives";
 import { primitiveToSvg } from "../render/svg";
 import { layoutContactSheet, SHEET, type SheetPage } from "./contactsheet";
 import { downloadBlob, downloadText, slugify } from "../lib/download";
@@ -101,7 +101,7 @@ function canvasToBlob(canvas: HTMLCanvasElement): Promise<Blob> {
   });
 }
 
-async function renderSheetPagePng(page: SheetPage, resolve: AssetResolver): Promise<Blob> {
+async function renderSheetPagePng(page: SheetPage): Promise<Blob> {
   const scale = 2;
   const canvas = document.createElement("canvas");
   canvas.width = Math.round(page.width * scale);
@@ -118,7 +118,7 @@ export async function exportSheetPng(sb: Storyboard, resolve: AssetResolver): Pr
   const pages = layoutContactSheet(sb, resolve);
   const slug = slugify(sb.title);
   for (let i = 0; i < pages.length; i++) {
-    const blob = await renderSheetPagePng(pages[i], resolve);
+    const blob = await renderSheetPagePng(pages[i]);
     downloadBlob(blob, `${slug}-contact-sheet-${pages.length > 1 ? `p${i + 1}-` : ""}${frameCountLabel(sb)}.png`);
   }
   return pages.length;
@@ -168,7 +168,7 @@ function sheetCellSvg(page: SheetPage): string {
   return out.join("\n");
 }
 
-function artInnerSvg(art: { background: string; primitives: import("../render/primitives").Primitive[] }): string {
+function artInnerSvg(art: { background: string; primitives: Primitive[] }): string {
   const defs: string[] = [];
   const body: string[] = [];
   let clipIndex = 0;
@@ -193,7 +193,7 @@ function escapeXml(s: string): string {
   return s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;").replace(/'/g, "&apos;");
 }
 
-export async function exportSheetSvg(sb: Storyboard, resolve: AssetResolver): Promise<number> {
+export function exportSheetSvg(sb: Storyboard, resolve: AssetResolver): number {
   const pages = layoutContactSheet(sb, resolve);
   const slug = slugify(sb.title);
   for (const page of pages) {

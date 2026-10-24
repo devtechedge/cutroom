@@ -11,7 +11,7 @@ export function setFrameMeta(sb: Storyboard, frameId: string, patch: Partial<Omi
 }
 
 export function setStoryboardMeta(sb: Storyboard, patch: Partial<Omit<Storyboard, "id" | "frames" | "schemaVersion">>): Storyboard {
-  return touch(sb, sb.frames.map((f) => f));
+  return { ...sb, ...patch, updatedAt: Date.now() };
 }
 
 export function insertFrameAfter(sb: Storyboard, afterIndex: number, frame: Frame = newFrame()): { sb: Storyboard; index: number } {
@@ -62,11 +62,13 @@ export function addObject(sb: Storyboard, frameId: string, obj: FrameObject): St
 export function updateObject(sb: Storyboard, frameId: string, objectId: string, patch: Partial<FrameObject>): Storyboard {
   return touch(
     sb,
-    sb.frames.map((f) =>
-      f.id === frameId
-        ? { ...f, objects: f.objects.map((o) => (o.id === objectId ? fitObjectToFrame({ ...o, ...patch } as FrameObject, sb.aspect)) : o)) 
-        : f,
-    ),
+    sb.frames.map((f) => {
+      if (f.id !== frameId) return f;
+      return {
+        ...f,
+        objects: f.objects.map((o) => (o.id === objectId ? fitObjectToFrame({ ...o, ...patch } as FrameObject, sb.aspect) : o)),
+      };
+    }),
   );
 }
 

@@ -39,7 +39,7 @@ export async function loadLibrary(): Promise<Library> {
       const asset = sanitizeAsset(raw);
       if (asset) assets.set(asset.id, asset);
     }
-    if (db.mode === "memory" && !warning) {
+    if (db.mode === "memory" && warning === null) {
       warning = "Storage is unavailable in this browser; changes last for this session only.";
     }
   } catch (err) {
@@ -71,7 +71,7 @@ export interface StorageEstimateInfo {
 
 export async function estimateUsage(): Promise<StorageEstimateInfo | null> {
   try {
-    if (navigator.storage && typeof navigator.storage.estimate === "function") {
+    if (typeof navigator.storage.estimate === "function") {
       const { usage = 0, quota = null } = await navigator.storage.estimate();
       return { usage, quota };
     }
