@@ -14,6 +14,15 @@ test("gallery passes axe", async ({ page }) => {
   expect(await seriousViolations(page), "gallery").toEqual([]);
 });
 
+test("mobile gallery and editor pass axe", async ({ page }) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.goto("/");
+  expect(await seriousViolations(page), "mobile gallery").toEqual([]);
+  await page.getByRole("button", { name: /^Open board / }).first().click();
+  await expect(page.getByLabel(/Stage: frame \d+ of \d+/)).toBeVisible();
+  expect(await seriousViolations(page), "mobile editor").toEqual([]);
+});
+
 test("editor, menus, dialogs, and preview pass axe", async ({ page }) => {
   await page.goto("/");
   await page.getByRole("button", { name: /^Open board / }).first().click();

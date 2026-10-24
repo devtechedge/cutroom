@@ -206,7 +206,7 @@ export function Menu({
             className={item.danger ? "danger" : undefined}
             disabled={item.disabled}
             onClick={() => {
-              onClose(false);
+              onClose(true);
               item.onSelect?.();
             }}
           >
@@ -237,7 +237,7 @@ export function MenuButton({
   const menuId = useId();
   const close = useCallback((restoreFocus: boolean): void => {
     setOpen(false);
-    if (restoreFocus) requestAnimationFrame(() => triggerRef.current?.focus());
+    if (restoreFocus) triggerRef.current?.focus();
   }, []);
   return (
     <span style={{ position: "relative", display: "inline-flex" }}>

@@ -70,7 +70,7 @@ function EditorInner({ resolve, assets, onAddAsset, onBack, onDelete, saveStatus
 
   const closeExportMenu = useCallback((restoreFocus: boolean): void => {
     setExportMenu(false);
-    if (restoreFocus) requestAnimationFrame(() => exportTriggerRef.current?.focus());
+    if (restoreFocus) exportTriggerRef.current?.focus();
   }, []);
 
   const showToast = useCallback((msg: string) => {
@@ -224,6 +224,7 @@ function EditorInner({ resolve, assets, onAddAsset, onBack, onDelete, saveStatus
             ref={exportTriggerRef}
             type="button"
             className="btn small"
+            aria-label="Export"
             aria-haspopup="menu"
             aria-expanded={exportMenu}
             aria-controls={exportMenu ? exportMenuId : undefined}

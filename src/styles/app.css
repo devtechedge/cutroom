@@ -229,7 +229,7 @@ button {
   border: none;
   border-right: 1px solid var(--line-strong);
   color: var(--ink-mid);
-  height: 30px;
+  height: 36px;
   padding: 0 11px;
   font-size: 12.5px;
 }
@@ -1049,6 +1049,7 @@ input[type="color"] {
   background: transparent;
   border: none;
   border-radius: 6px;
+  min-height: 36px;
   padding: 8px 10px;
   text-align: left;
   color: var(--ink);
