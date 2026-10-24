@@ -360,16 +360,16 @@ test.describe("CUTROOM journey", () => {
   test("print route renders the contact sheet", async ({ page }) => {
     await openFirstBoard(page);
     await page.getByRole("button", { name: "Export" }).click();
-    const popupPromise = page.waitForEvent("popup");
     await page.getByRole("menuitem", { name: "Print / save as PDF" }).click();
-    const popup = await popupPromise;
-    await expect(popup).toHaveURL(/#\/print\//);
-    await expect(popup.getByLabel("Contact sheet page 1 of 1")).toBeVisible();
-    await expect(popup.locator(".print-cell")).not.toHaveCount(0);
-    await expect(popup.getByRole("button", { name: "Print / save as PDF" })).toBeVisible();
-    await popup.emulateMedia({ media: "print" });
-    await expect(popup.locator(".print-toolbar")).toBeHidden();
-    await popup.close();
+    await expect(page).toHaveURL(/#\/print\//);
+    await expect(page.getByLabel("Contact sheet page 1 of 1")).toBeVisible();
+    await expect(page.locator(".print-cell")).not.toHaveCount(0);
+    await expect(page.getByRole("button", { name: "Print / save as PDF" })).toBeVisible();
+    await page.emulateMedia({ media: "print" });
+    await expect(page.locator(".print-toolbar")).toBeHidden();
+    await page.emulateMedia({ media: "screen" });
+    await page.getByRole("button", { name: "Back to board" }).click();
+    await expect(page.getByLabel(/Stage: frame \d+ of \d+/)).toBeVisible();
   });
 
   test("deleted boards survive reload in the trash and restore", async ({ page }) => {

@@ -291,10 +291,7 @@ function EditorInner({ resolve, assets, onAddAsset, onBack, onDelete, saveStatus
                   label: "Print / save as PDF",
                   separatorBefore: true,
                   onSelect: () => {
-                    const url = `${window.location.pathname}${window.location.search}#/print/${encodeURIComponent(sb.id)}`;
-                    const opened = window.open(url, "_blank");
-                    if (opened) opened.opener = null;
-                    else showToast("Allow pop-ups to open the print sheet, or use the browser print command.");
+                    window.location.hash = `#/print/${encodeURIComponent(sb.id)}`;
                   },
                 },
                 { label: "Project JSON", onSelect: () => void runExport("json") },
