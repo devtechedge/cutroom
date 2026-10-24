@@ -111,6 +111,7 @@ test.describe("CUTROOM journey", () => {
   });
 
   test("project JSON carries uploaded images into a fresh profile", async ({ page, browser }) => {
+
     await openFirstBoard(page);
     const boardTitle = await page.getByLabel("Board title").inputValue();
     const chooserPromise = page.waitForEvent("filechooser");
@@ -147,6 +148,38 @@ test.describe("CUTROOM journey", () => {
     await expect(freshPage.locator("svg[aria-label^=\"Frame\"] image")).toHaveCount(1);
     await expect(freshPage.getByText("Image missing")).toHaveCount(0);
     await fresh.close();
+  });
+
+  test("SVG contact sheet is valid XML and opens", async ({ page, browser }) => {
+    await openFirstBoard(page);
+    await page.getByRole("button", { name: "Export" }).click();
+    const downloadPromise = page.waitForEvent("download");
+    await page.getByRole("menuitem", { name: "Contact sheet (SVG)" }).click();
+    const download = await downloadPromise;
+    const svgPath = await download.path();
+    const svg = fs.readFileSync(svgPath, "utf8");
+    expect(svg).not.toContain("\u2014");
+    expect(svg).toContain("font-family=");
+    const parsed = await page.evaluate((text) => {
+      const doc = new DOMParser().parseFromString(text, "image/svg+xml");
+      return {
+        parserError: Boolean(doc.querySelector("parsererror")),
+        textLength: doc.documentElement.textContent.length,
+      };
+    }, svg);
+    expect(parsed.parserError).toBe(false);
+    expect(parsed.textLength).toBeGreaterThan(0);
+
+    const svgContext = await browser.newContext();
+    const svgPage = await svgContext.newPage();
+    await svgPage.setContent(`<img id="sheet" alt="contact sheet" src="data:image/svg+xml;base64,${Buffer.from(svg).toString("base64")}">`);
+    await svgPage.waitForFunction(() => (document.getElementById("sheet") as HTMLImageElement).complete);
+    const loaded = await svgPage.evaluate(() => {
+      const image = document.getElementById("sheet") as HTMLImageElement;
+      return image.naturalWidth > 0;
+    });
+    expect(loaded).toBe(true);
+    await svgContext.close();
   });
 
   test("invalid JSON import explains itself; valid JSON round-trips", async ({ page }) => {

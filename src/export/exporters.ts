@@ -89,7 +89,7 @@ function paintSheetPage(ctx: CanvasRenderingContext2D, page: SheetPage, images: 
   ctx.fillStyle = ink.muted;
   ctx.font = `400 14px ${FONT_STACKS.mono}`;
   ctx.textAlign = "left";
-  ctx.fillText(`CUTROOM \u2014 ${truncate(page.title, 48)}`, SHEET.margin, footerY);
+  ctx.fillText(`CUTROOM - ${truncate(page.title, 48)}`, SHEET.margin, footerY);
   ctx.textAlign = "right";
   ctx.fillText(`${page.frameCount} frames \u00b7 sheet ${page.pageIndex + 1}/${page.pageCount}`, page.width - SHEET.margin, footerY);
   ctx.textAlign = "left";
@@ -115,6 +115,7 @@ async function renderSheetPagePng(page: SheetPage): Promise<Blob> {
 }
 
 export async function exportSheetPng(sb: Storyboard, resolve: AssetResolver): Promise<number> {
+  await document.fonts.ready;
   const pages = layoutContactSheet(sb, resolve);
   const slug = slugify(sb.title);
   for (let i = 0; i < pages.length; i++) {
@@ -130,11 +131,16 @@ function frameCountLabel(sb: Storyboard): string {
 
 function sheetCellSvg(page: SheetPage): string {
   const ink = sheetInk(page.paper);
+  const fonts = {
+    grotesk: escapeXml(FONT_STACKS.grotesk),
+    mono: escapeXml(FONT_STACKS.mono),
+    serif: escapeXml(FONT_STACKS.serif),
+  };
   const out: string[] = [];
-  out.push(`<text x="${SHEET.margin}" y="${SHEET.margin + SHEET.headerTitleSize}" font-family="${FONT_STACKS.grotesk}" font-size="${SHEET.headerTitleSize}" font-weight="600" fill="${ink.ink}">${escapeXml(truncate(page.title, 58))}</text>`);
-  out.push(`<text x="${SHEET.margin}" y="${SHEET.margin + SHEET.headerTitleSize + 30}" font-family="${FONT_STACKS.mono}" font-size="${SHEET.headerMetaSize}" fill="${ink.muted}">${escapeXml(page.meta)}</text>`);
+  out.push(`<text x="${SHEET.margin}" y="${SHEET.margin + SHEET.headerTitleSize}" font-family="${fonts.grotesk}" font-size="${SHEET.headerTitleSize}" font-weight="600" fill="${ink.ink}">${escapeXml(truncate(page.title, 58))}</text>`);
+  out.push(`<text x="${SHEET.margin}" y="${SHEET.margin + SHEET.headerTitleSize + 30}" font-family="${fonts.mono}" font-size="${SHEET.headerMetaSize}" fill="${ink.muted}">${escapeXml(page.meta)}</text>`);
   if (page.brief.length > 0) {
-    out.push(`<text x="${SHEET.margin}" y="${SHEET.margin + SHEET.headerTitleSize + 56}" font-family="${FONT_STACKS.serif}" font-size="${SHEET.headerBriefSize}" font-style="italic" fill="${ink.muted}">${escapeXml(truncate(page.brief, 130))}</text>`);
+    out.push(`<text x="${SHEET.margin}" y="${SHEET.margin + SHEET.headerTitleSize + 56}" font-family="${fonts.serif}" font-size="${SHEET.headerBriefSize}" font-style="italic" fill="${ink.muted}">${escapeXml(truncate(page.brief, 130))}</text>`);
   }
   const ruleY = SHEET.margin + SHEET.headerHeight - 26;
   out.push(`<line x1="${SHEET.margin}" y1="${ruleY}" x2="${page.width - SHEET.margin}" y2="${ruleY}" stroke="${ink.rule}" stroke-width="2"/>`);
@@ -146,24 +152,24 @@ function sheetCellSvg(page: SheetPage): string {
       `<rect x="${cell.artX + 0.5}" y="${cell.artY + 0.5}" width="${cell.artW - 1}" height="${cell.artH - 1}" fill="none" stroke="${ink.rule}" stroke-width="1"/>`,
     );
     const textY = cell.artY + cell.artH;
-    out.push(`<text x="${cell.artX}" y="${textY + 26}" font-family="${FONT_STACKS.mono}" font-size="20" font-weight="600" fill="${ink.ink}">${frameNumber(cell.index)}</text>`);
+    out.push(`<text x="${cell.artX}" y="${textY + 26}" font-family="${fonts.mono}" font-size="20" font-weight="600" fill="${ink.ink}">${frameNumber(cell.index)}</text>`);
     const tagBits: string[] = [];
     if (cell.shot.length > 0) tagBits.push(cell.shot);
     tagBits.push(`${cell.duration.toFixed(1)}s`);
     out.push(
-      `<text x="${cell.artX + 44}" y="${textY + 25}" font-family="${FONT_STACKS.mono}" font-size="13" fill="${ink.muted}">${escapeXml(tagBits.join(" \u00b7 "))}</text>`,
+      `<text x="${cell.artX + 44}" y="${textY + 25}" font-family="${fonts.mono}" font-size="13" fill="${ink.muted}">${escapeXml(tagBits.join(" \u00b7 "))}</text>`,
     );
     cell.captionLines.forEach((line, i) => {
       out.push(
-        `<text x="${cell.artX}" y="${textY + 52 + i * SHEET.captionSize * SHEET.captionLineHeight}" font-family="${FONT_STACKS.mono}" font-size="${SHEET.captionSize}" fill="${ink.muted}">${escapeXml(line)}</text>`,
+        `<text x="${cell.artX}" y="${textY + 52 + i * SHEET.captionSize * SHEET.captionLineHeight}" font-family="${fonts.mono}" font-size="${SHEET.captionSize}" fill="${ink.muted}">${escapeXml(line)}</text>`,
       );
     });
   }
   const footerY = page.height - SHEET.margin + 8;
   out.push(`<line x1="${SHEET.margin}" y1="${footerY - 26}" x2="${page.width - SHEET.margin}" y2="${footerY - 26}" stroke="${ink.rule}" stroke-width="1"/>`);
-  out.push(`<text x="${SHEET.margin}" y="${footerY}" font-family="${FONT_STACKS.mono}" font-size="14" fill="${ink.muted}">${escapeXml(`CUTROOM \u2014 ${truncate(page.title, 48)}`)}</text>`);
+  out.push(`<text x="${SHEET.margin}" y="${footerY}" font-family="${fonts.mono}" font-size="14" fill="${ink.muted}">${escapeXml(`CUTROOM - ${truncate(page.title, 48)}`)}</text>`);
   out.push(
-    `<text x="${page.width - SHEET.margin}" y="${footerY}" text-anchor="end" font-family="${FONT_STACKS.mono}" font-size="14" fill="${ink.muted}">${escapeXml(`${page.frameCount} frames \u00b7 sheet ${page.pageIndex + 1}/${page.pageCount}`)}</text>`,
+    `<text x="${page.width - SHEET.margin}" y="${footerY}" text-anchor="end" font-family="${fonts.mono}" font-size="14" fill="${ink.muted}">${escapeXml(`${page.frameCount} frames \u00b7 sheet ${page.pageIndex + 1}/${page.pageCount}`)}</text>`,
   );
   return out.join("\n");
 }
@@ -210,6 +216,7 @@ export function exportSheetSvg(sb: Storyboard, resolve: AssetResolver): number {
 
 /** PNG of a single frame's art at 1600px width. */
 export async function exportFramePng(sb: Storyboard, frame: Frame, index: number, resolve: AssetResolver): Promise<void> {
+  await document.fonts.ready;
   const art = renderFrameArt(frame, sb.aspect, 1600, resolve);
   const canvas = document.createElement("canvas");
   canvas.width = Math.round(art.width);
