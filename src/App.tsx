@@ -58,6 +58,9 @@ export default function App(): JSX.Element {
 
   useEffect(() => {
     document.documentElement.dataset.theme = theme;
+    document.documentElement.style.colorScheme = theme;
+    const meta = document.querySelector('meta[name="theme-color"]');
+    if (meta) meta.setAttribute("content", theme === "light" ? "#efe9db" : "#1d1b18");
     try {
       localStorage.setItem("cutroom-theme", theme);
     } catch {
@@ -275,7 +278,12 @@ export default function App(): JSX.Element {
   const editorCommit = useMemo(() => (sb: Storyboard) => commitProject(sb), [commitProject]);
 
   if (!booted) {
-    return <div style={{ minHeight: "100vh" }} aria-busy="true" />;
+    return (
+      <div className="boot-shell" role="status" aria-live="polite">
+        <div className="boot-wordmark">CUTROOM</div>
+        <div className="boot-line">Loading your boards</div>
+      </div>
+    );
   }
 
   return (

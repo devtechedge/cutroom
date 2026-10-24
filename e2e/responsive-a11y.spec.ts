@@ -34,6 +34,26 @@ test.describe("responsive", () => {
     await expect(aside).toHaveAttribute("data-open", "false");
   });
 
+  test("boots in the stored theme before the app script loads", async ({ page }) => {
+    await page.addInitScript(() => {
+      try {
+        localStorage.setItem("cutroom-theme", "light");
+      } catch {
+        // ignore storage failures in the test shim
+      }
+    });
+    await page.route("**/*.js", async (route) => {
+      await new Promise((resolve) => setTimeout(resolve, 800));
+      await route.continue();
+    });
+    await page.goto("/", { waitUntil: "commit" });
+    await expect(page.locator("html")).toHaveAttribute("data-theme", "light");
+    await expect(page.locator(".boot-shell")).toBeVisible();
+    const background = await page.evaluate(() => getComputedStyle(document.body).backgroundColor);
+    expect(background).toBe("rgb(239, 233, 219)");
+    await expect(page.getByRole("heading", { level: 1 })).toBeVisible();
+  });
+
   test("theme choice persists across reload", async ({ page }) => {
     await page.goto("/");
     await page.getByRole("button", { name: "Switch to light theme" }).click();
