@@ -80,7 +80,7 @@ export function Dialog({
             <Icon name="close" />
           </button>
         </div>
-        <div className="dialog-body">{children}</div>
+        <div className="dialog-body scroll-hover">{children}</div>
         {footer && <div className="dialog-foot">{footer}</div>}
       </div>
     </Backdrop>,

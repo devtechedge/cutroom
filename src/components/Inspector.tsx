@@ -147,7 +147,7 @@ export function Inspector({ open, onAddAsset, onToast }: InspectorProps): JSX.El
   };
 
   return (
-    <aside className="inspector" data-open={open} aria-label="Inspector">
+    <aside className="inspector scroll-hover" data-open={open} aria-label="Inspector">
       <div className="inspector-inner">
         {object ? (
           <>
