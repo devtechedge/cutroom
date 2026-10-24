@@ -7,6 +7,8 @@ import { FrameArtView } from "./FrameView";
 import { Icon } from "./Icon";
 import { Backdrop, LiveStatus } from "./ui";
 
+/* eslint-disable jsx-a11y/no-noninteractive-tabindex -- the scrollable preview stage must be focusable */
+
 const FOCUSABLE = 'a[href], button:not([disabled]), input:not([disabled]), select:not([disabled]), [tabindex]:not([tabindex="-1"])';
 
 export interface PreviewProps {
