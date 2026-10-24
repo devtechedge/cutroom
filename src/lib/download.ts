@@ -1,11 +1,18 @@
 export function slugify(s: string): string {
-  const slug = s
+  const ascii = s
     .toLowerCase()
     .normalize("NFKD")
     .replace(/[^a-z0-9]+/g, "-")
     .replace(/^-+|-+$/g, "")
     .slice(0, 60);
-  return slug.length > 0 ? slug : "cutroom";
+  if (ascii.length > 0) return ascii;
+  const unicode = s
+    .normalize("NFKC")
+    .toLowerCase()
+    .replace(/[^\p{L}\p{N}\p{M}]+/gu, "-")
+    .replace(/^-+|-+$/g, "")
+    .slice(0, 60);
+  return unicode.length > 0 ? unicode : "cutroom";
 }
 
 export function downloadBlob(blob: Blob, filename: string): void {

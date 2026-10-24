@@ -171,10 +171,10 @@ function EditorInner({ resolve, assets, onAddAsset, onBack, onDelete, saveStatus
         showToast("Project JSON downloaded with its images, so it can be re-imported anywhere.");
       } else if (kind === "sheet-png") {
         const pages = await exportSheetPng(sb, resolve);
-        showToast(`Contact sheet exported (${pages} page${pages === 1 ? "" : "s"}, PNG).`);
+        showToast(`Contact sheet exported (${pages} page${pages === 1 ? "" : "s"}, PNG${pages > 1 ? ", ZIP" : ""}).`);
       } else if (kind === "sheet-svg") {
         const pages = exportSheetSvg(sb, resolve);
-        showToast(`Contact sheet exported (${pages} page${pages === 1 ? "" : "s"}, SVG).`);
+        showToast(`Contact sheet exported (${pages} page${pages === 1 ? "" : "s"}, SVG${pages > 1 ? ", ZIP" : ""}).`);
       } else if (frame) {
         await exportFramePng(sb, frame, frameIndex, resolve);
         showToast(`Frame ${frameNumber(frameIndex)} exported as PNG.`);

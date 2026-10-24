@@ -1,3 +1,4 @@
+import { strToU8, zipSync } from "fflate";
 import { loadImages, paintArt } from "../render/canvas";
 import { FONT_STACKS } from "../render/fonts";
 import { renderFrameArt, type AssetResolver, type Primitive } from "../render/primitives";
@@ -117,11 +118,18 @@ async function renderSheetPagePng(page: SheetPage): Promise<Blob> {
 export async function exportSheetPng(sb: Storyboard, resolve: AssetResolver): Promise<number> {
   await document.fonts.ready;
   const pages = layoutContactSheet(sb, resolve);
-  const slug = slugify(sb.title);
-  for (let i = 0; i < pages.length; i++) {
-    const blob = await renderSheetPagePng(pages[i]);
-    downloadBlob(blob, `${slug}-contact-sheet-${pages.length > 1 ? `p${i + 1}-` : ""}${frameCountLabel(sb)}.png`);
+  const base = `${slugify(sb.title)}-contact-sheet-${frameCountLabel(sb)}`;
+  if (pages.length === 1) {
+    const blob = await renderSheetPagePng(pages[0]);
+    downloadBlob(blob, `${base}.png`);
+    return 1;
   }
+  const files: Record<string, Uint8Array> = {};
+  for (let i = 0; i < pages.length; i += 1) {
+    const blob = await renderSheetPagePng(pages[i]);
+    files[`${base}-p${i + 1}.png`] = new Uint8Array(await blob.arrayBuffer());
+  }
+  downloadBlob(new Blob([zipSync(files)]), `${base}.zip`);
   return pages.length;
 }
 
@@ -199,18 +207,27 @@ function escapeXml(s: string): string {
   return s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;").replace(/'/g, "&apos;");
 }
 
+function sheetSvg(page: SheetPage): string {
+  return [
+    `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${page.width} ${page.height}" width="${page.width}" height="${page.height}">`,
+    `<rect width="${page.width}" height="${page.height}" fill="${page.paper}"/>`,
+    sheetCellSvg(page),
+    `</svg>`,
+  ].join("\n");
+}
+
 export function exportSheetSvg(sb: Storyboard, resolve: AssetResolver): number {
   const pages = layoutContactSheet(sb, resolve);
-  const slug = slugify(sb.title);
-  for (const page of pages) {
-    const svg = [
-      `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${page.width} ${page.height}" width="${page.width}" height="${page.height}">`,
-      `<rect width="${page.width}" height="${page.height}" fill="${page.paper}"/>`,
-      sheetCellSvg(page),
-      `</svg>`,
-    ].join("\n");
-    downloadText(svg, `${slug}-contact-sheet-${pages.length > 1 ? `p${page.pageIndex + 1}-` : ""}${frameCountLabel(sb)}.svg`, "image/svg+xml");
+  const base = `${slugify(sb.title)}-contact-sheet-${frameCountLabel(sb)}`;
+  if (pages.length === 1) {
+    downloadText(sheetSvg(pages[0]), `${base}.svg`, "image/svg+xml");
+    return 1;
   }
+  const files: Record<string, Uint8Array> = {};
+  for (const page of pages) {
+    files[`${base}-p${page.pageIndex + 1}.svg`] = strToU8(sheetSvg(page));
+  }
+  downloadBlob(new Blob([zipSync(files)]), `${base}.zip`);
   return pages.length;
 }
 

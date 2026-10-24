@@ -1,4 +1,5 @@
 import fs from "node:fs";
+import { unzipSync, strFromU8 } from "fflate";
 import { expect, test, type Page } from "@playwright/test";
 
 test.describe("CUTROOM journey", () => {
@@ -260,6 +261,25 @@ test.describe("CUTROOM journey", () => {
     expect(download.suggestedFilename()).toMatch(/contact-sheet.*\.png$/);
     const png = fs.readFileSync(await download.path());
     expect(png.subarray(0, 8)).toEqual(Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]));
+  });
+
+  test("multi-page contact sheets download one ZIP", async ({ page }) => {
+    await openFirstBoard(page);
+    for (let i = 0; i < 3; i += 1) {
+      await page.locator('.frame-card[data-current="true"]').getByRole("button", { name: /^Duplicate frame/ }).click();
+    }
+    await page.getByRole("button", { name: "Export" }).click();
+    const downloadPromise = page.waitForEvent("download");
+    await page.getByRole("menuitem", { name: "Contact sheet (SVG)" }).click();
+    const download = await downloadPromise;
+    expect(download.suggestedFilename()).toMatch(/contact-sheet.*\.zip$/);
+    const files = unzipSync(new Uint8Array(fs.readFileSync(await download.path())));
+    const names = Object.keys(files);
+    expect(names).toHaveLength(2);
+    expect(names.every((name) => name.endsWith(".svg"))).toBe(true);
+    const first = strFromU8(files[names[0]]);
+    expect(first).toContain("<svg");
+    expect(first).not.toContain("\u2014");
   });
 
   test("invalid JSON import explains itself; valid JSON round-trips", async ({ page }) => {
