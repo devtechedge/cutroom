@@ -9,11 +9,11 @@ Storyboard the cut before you shoot it. CUTROOM is a cinematic storyboard and vi
 [![TypeScript](https://img.shields.io/badge/TypeScript-strict-3178C6?logo=typescript&logoColor=white&style=flat-square)](https://www.typescriptlang.org/)
 [![License](https://img.shields.io/badge/License-MIT-d7f04c?style=flat-square)](LICENSE)
 
-## Live demo
+## Live Demo
 
 **[cutroom-green.vercel.app](https://cutroom-green.vercel.app)**
 
-> CUTROOM is client-only. Boards and uploaded images stay in your browser's IndexedDB, on your device. There is no account, no server and no telemetry, and the app makes no external requests after it loads. Clearing site data removes the boards.
+> **Status:** CUTROOM is client-only. Boards and uploaded images stay in your browser's IndexedDB, on your device. There is no account, no server and no telemetry, and the app makes no external requests after it loads. Clearing site data removes the boards.
 
 ## Screenshots
 
@@ -23,7 +23,7 @@ Storyboard the cut before you shoot it. CUTROOM is a cinematic storyboard and vi
 | **Preview** | **Phone editor** |
 | ![Preview player with sequence navigation](docs/screenshots/03-preview.png) | ![Editor on a phone viewport](docs/screenshots/04-mobile-editor.png) |
 
-## What it does
+## Features
 
 - **Four starter boards** to open, edit or clear: a short film, a product launch, a science lesson and a game cinematic.
 - **Frame composition** with image, shape, text and vector artwork objects, plus drag, resize, keyboard nudging, guides and zoom.
@@ -34,7 +34,7 @@ Storyboard the cut before you shoot it. CUTROOM is a cinematic storyboard and vi
 - **Local-first persistence** with debounced autosave, an honest in-memory fallback when storage is blocked, and orphaned asset cleanup.
 - **Light and dark themes** with keyboard paths for frames, objects, reordering and preview.
 
-## Stack
+## Tech Stack
 
 | Layer | Choice |
 | --- | --- |
@@ -45,7 +45,7 @@ Storyboard the cut before you shoot it. CUTROOM is a cinematic storyboard and vi
 | Type | Space Grotesk, Source Serif 4 and IBM Plex Mono, self-hosted |
 | Tests | Vitest unit suite and Playwright end-to-end suite |
 
-## Run it
+## Quick Start
 
 Requires Node 22 or newer.
 
@@ -64,3 +64,5 @@ npm run e2e      # builds the app, then runs the browser suite
 ## License
 
 MIT. Font licenses and asset provenance are listed in [LICENSES.md](LICENSES.md).
+
+Security reports: see [SECURITY.md](SECURITY.md).
