@@ -93,7 +93,7 @@ export function Welcome({ theme, onToggleTheme, onOpenDemo }: { theme: "dark" | 
   return (
     <div className="info-shell scroll-hover">
       <SiteHeader theme={theme} onToggleTheme={onToggleTheme} />
-      <main className="welcome" id="main">
+      <main className="info-main welcome" id="main">
         <section className="welcome-hero">
           <p className="info-eyebrow mono">Storyboard and visual narrative studio</p>
           <h1>Storyboard the cut before you shoot it.</h1>

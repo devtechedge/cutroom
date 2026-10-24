@@ -37,11 +37,11 @@ test("print sheet renders the contact sheet", async ({ page }) => {
   });
 });
 
-test("welcome hero renders", async ({ page }) => {
+test("welcome page renders", async ({ page }) => {
   await page.goto("/#/welcome");
   await expect(page.getByRole("heading", { level: 1 })).toBeVisible();
   await page.evaluate(() => document.fonts.ready);
-  await expect(page.locator(".welcome-hero")).toHaveScreenshot("welcome-hero.png", {
+  await expect(page).toHaveScreenshot("welcome-page.png", {
     animations: "disabled",
     maxDiffPixelRatio: 0.002,
   });
