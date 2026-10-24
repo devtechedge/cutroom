@@ -4,7 +4,7 @@ import { renderFrameArt, type AssetResolver, type Primitive } from "../render/pr
 import { primitiveToSvg } from "../render/svg";
 import { layoutContactSheet, SHEET, type SheetPage } from "./contactsheet";
 import { downloadBlob, downloadText, slugify } from "../lib/download";
-import { buildProjectFile, MAX_PROJECT_BYTES, parseProjectFile, type ParsedProject } from "./projectfile";
+import { MAX_PROJECT_BYTES, parseProjectFile, serializeProjectFile, type ParsedProject } from "./projectfile";
 import { frameNumber } from "../model/geometry";
 import type { Asset, Frame, Storyboard } from "../model/types";
 
@@ -230,10 +230,7 @@ export async function exportFramePng(sb: Storyboard, frame: Frame, index: number
 }
 
 export function exportProjectJson(sb: Storyboard, assets: Iterable<Asset>): void {
-  const text = JSON.stringify(buildProjectFile(sb, assets), null, 2);
-  if (new Blob([text]).size > MAX_PROJECT_BYTES) {
-    throw new Error("Project JSON is larger than 25 MB. Remove or downscale images and try again.");
-  }
+  const text = serializeProjectFile(sb, assets);
   downloadText(text, `${slugify(sb.title)}.cutroom.json`, "application/json");
 }
 

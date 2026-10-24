@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
-import { buildProjectFile, parseProjectFile, remapAssetIds } from "../../src/export/projectfile";
+import { buildProjectFile, MAX_PROJECT_BYTES, parseProjectFile, remapAssetIds, serializeProjectFile } from "../../src/export/projectfile";
+import { importStoryboardFile } from "../../src/export/exporters";
 import { newImageObject, newStoryboard } from "../../src/model/defaults";
 import type { Asset, ImageObject } from "../../src/model/types";
 
@@ -65,5 +66,31 @@ describe("project file", () => {
     const remapped = remapAssetIds(boardWithImage(), new Map([["asset-1", "asset-2"]]));
     const image = remapped.frames[0].objects[0] as ImageObject;
     expect(image.assetId).toBe("asset-2");
+  });
+
+  it("serializes a normal project file", () => {
+    const text = serializeProjectFile(boardWithImage(), [asset]);
+    expect(text).toContain('"format": "cutroom-project"');
+    expect(text).toContain('"assets": [');
+  });
+
+  it("rejects a project export larger than 25 MB", () => {
+    const huge: Asset = {
+      ...asset,
+      id: "asset-huge",
+      dataUrl: "data:image/png;base64," + "A".repeat(MAX_PROJECT_BYTES),
+    };
+    const board = newStoryboard({ title: "Huge board" });
+    board.frames[0].objects.push(newImageObject("asset-huge", { x: 0, y: 0, w: 100, h: 100 }));
+    expect(() => serializeProjectFile(board, [huge])).toThrow(/25 MB/);
+  });
+
+  it("rejects an oversized import before reading the file", async () => {
+    const file = {
+      name: "huge.cutroom.json",
+      size: MAX_PROJECT_BYTES + 1,
+      text: () => Promise.resolve("{}"),
+    } as unknown as File;
+    await expect(importStoryboardFile(file)).rejects.toThrow(/25 MB/);
   });
 });

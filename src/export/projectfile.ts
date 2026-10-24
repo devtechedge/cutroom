@@ -46,6 +46,14 @@ export function buildProjectFile(sb: Storyboard, assets: Iterable<Asset>): Proje
   };
 }
 
+export function serializeProjectFile(sb: Storyboard, assets: Iterable<Asset>): string {
+  const text = JSON.stringify(buildProjectFile(sb, assets), null, 2);
+  if (new TextEncoder().encode(text).length > MAX_PROJECT_BYTES) {
+    throw new Error("Project JSON is larger than 25 MB. Remove or downscale images and try again.");
+  }
+  return text;
+}
+
 export function remapAssetIds(sb: Storyboard, mapping: ReadonlyMap<string, string>): Storyboard {
   return {
     ...sb,
