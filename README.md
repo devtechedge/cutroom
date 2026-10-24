@@ -29,7 +29,7 @@ Storyboard the cut before you shoot it. CUTROOM is a cinematic storyboard and vi
 - **Frame composition** with image, shape, text and vector artwork objects, plus drag, resize, keyboard nudging, guides and zoom.
 - **Shot rhythm** through per-frame hold, shot type and transition, with drag or keyboard reordering on the timeline.
 - **Preview playback** with cut, dissolve and slide transitions, a reduced-motion fallback, looping and frame stepping.
-- **Exports** as a multi-page contact sheet in PNG or SVG, a single frame in PNG, or the whole project as JSON.
+- **Exports** as a multi-page contact sheet in PNG or SVG, a single frame in PNG, or the whole project as JSON with its images included.
 - **Validated imports** that rebuild a board field by field through a whitelist sanitizer and report every issue instead of failing silently.
 - **Local-first persistence** with debounced autosave, an honest in-memory fallback when storage is blocked, and orphaned asset cleanup.
 - **Light and dark themes** with keyboard paths for frames, objects, reordering and preview.

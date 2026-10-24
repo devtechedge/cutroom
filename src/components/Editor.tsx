@@ -25,6 +25,7 @@ export interface SaveStatus {
 
 export interface EditorProps {
   resolve: AssetResolver;
+  assets: Map<string, Asset>;
   onAddAsset: (asset: Asset) => void;
   onBack: () => void;
   onDelete: () => void;
@@ -51,7 +52,7 @@ function SaveStatusView({ status }: { status: SaveStatus }): JSX.Element {
   );
 }
 
-function EditorInner({ resolve, onAddAsset, onBack, onDelete, saveStatus, theme, onToggleTheme, persistent }: EditorProps): JSX.Element {
+function EditorInner({ resolve, assets, onAddAsset, onBack, onDelete, saveStatus, theme, onToggleTheme, persistent }: EditorProps): JSX.Element {
   const ed = useEditor();
   const { sb, frame, frameIndex, object } = ed;
   const [preview, setPreview] = useState(false);
@@ -158,8 +159,8 @@ function EditorInner({ resolve, onAddAsset, onBack, onDelete, saveStatus, theme,
     setExporting(true);
     try {
       if (kind === "json") {
-        exportProjectJson(sb);
-        showToast("Project JSON downloaded. It embeds image data, so it can be re-imported anywhere.");
+        exportProjectJson(sb, assets.values());
+        showToast("Project JSON downloaded with its images, so it can be re-imported anywhere.");
       } else if (kind === "sheet-png") {
         const pages = await exportSheetPng(sb, resolve);
         showToast(`Contact sheet exported (${pages} page${pages === 1 ? "" : "s"}, PNG).`);

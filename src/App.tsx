@@ -1,10 +1,12 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type JSX } from "react";
 import type { Asset, Storyboard } from "./model/types";
 import { duplicateStoryboard } from "./model/ops";
+import { newId } from "./model/ids";
 import { estimateUsage, loadLibrary, saveAssetRecord, saveProject, deleteProjectRecord, deleteAssetRecord } from "./persist/store";
 import type { SimpleDB } from "./persist/db";
 import type { AssetResolver } from "./render/primitives";
 import { exportProjectJson, importStoryboardFile } from "./export/exporters";
+import { remapAssetIds } from "./export/projectfile";
 import { formatBytes } from "./lib/format";
 import { Gallery } from "./components/Gallery";
 import { Editor, type SaveStatus } from "./components/Editor";
@@ -223,9 +225,26 @@ export default function App(): JSX.Element {
 
   const importProject = async (file: File): Promise<void> => {
     try {
-      const { sb, fixes } = await importStoryboardFile(file);
-      const exists = projects.some((p) => p.id === sb.id);
-      const imported = exists ? { ...sb, id: `${sb.id}-${Math.random().toString(36).slice(2, 6)}` } : sb;
+      const { sb, assets: importedAssets, fixes } = await importStoryboardFile(file);
+      let board = sb;
+      if (importedAssets.length > 0) {
+        const mapping = new Map<string, string>();
+        const copies = importedAssets.map((asset) => ({ ...asset, id: newId(), addedAt: Date.now() }));
+        importedAssets.forEach((asset, index) => mapping.set(asset.id, copies[index].id));
+        board = remapAssetIds(board, mapping);
+        setAssets((prev) => {
+          const next = new Map(prev);
+          for (const asset of copies) next.set(asset.id, asset);
+          return next;
+        });
+        if (db) {
+          for (const asset of copies) {
+            void saveAssetRecord(db, asset).catch(() => showToast("An imported image could not be stored; it will work until this tab closes."));
+          }
+        }
+      }
+      const exists = projects.some((p) => p.id === board.id);
+      const imported = exists ? { ...board, id: `${board.id}-${Math.random().toString(36).slice(2, 6)}` } : board;
       upsertProject(imported);
       if (db) void saveProject(db, imported).catch(() => undefined);
       if (fixes.length > 0) {
@@ -238,6 +257,18 @@ export default function App(): JSX.Element {
       setImportIssues({ title: file.name, issues: [err instanceof Error ? err.message : "The file could not be read as a CUTROOM project."] });
     }
   };
+
+  const exportJson = useCallback(
+    (project: Storyboard): void => {
+      try {
+        exportProjectJson(project, assets.values());
+        showToast("Project JSON downloaded with its images.");
+      } catch (err) {
+        showToast(err instanceof Error ? err.message : "Project export failed.");
+      }
+    },
+    [assets, showToast],
+  );
 
   const current = route.name === "editor" ? projects.find((p) => p.id === route.id) : undefined;
 
@@ -262,7 +293,7 @@ export default function App(): JSX.Element {
           onDuplicate={duplicateProject}
           onExportJson={(id) => {
             const p = projects.find((x) => x.id === id);
-            if (p) exportProjectJson(p);
+            if (p) exportJson(p);
           }}
           onDelete={deleteProject}
           onImport={(file) => void importProject(file)}
@@ -276,6 +307,7 @@ export default function App(): JSX.Element {
           project={current}
           onCommit={editorCommit}
           resolve={resolve}
+          assets={assets}
           onAddAsset={addAsset}
           onBack={() => setRoute({ name: "gallery" })}
           onDelete={() => deleteProject(current.id)}

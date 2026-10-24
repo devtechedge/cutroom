@@ -4,9 +4,9 @@ import { renderFrameArt, type AssetResolver, type Primitive } from "../render/pr
 import { primitiveToSvg } from "../render/svg";
 import { layoutContactSheet, SHEET, type SheetPage } from "./contactsheet";
 import { downloadBlob, downloadText, slugify } from "../lib/download";
-import { sanitizeStoryboard, type ValidationIssue } from "../model/validate";
+import { buildProjectFile, MAX_PROJECT_BYTES, parseProjectFile, type ParsedProject } from "./projectfile";
 import { frameNumber } from "../model/geometry";
-import type { Frame, Storyboard } from "../model/types";
+import type { Asset, Frame, Storyboard } from "../model/types";
 
 function luminance(hex: string): number {
   const r = parseInt(hex.slice(1, 3), 16) / 255;
@@ -222,16 +222,20 @@ export async function exportFramePng(sb: Storyboard, frame: Frame, index: number
   downloadBlob(blob, `${slugify(sb.title)}-frame-${frameNumber(index)}.png`);
 }
 
-export function exportProjectJson(sb: Storyboard): void {
-  downloadText(JSON.stringify(sb, null, 2), `${slugify(sb.title)}.cutroom.json`, "application/json");
+export function exportProjectJson(sb: Storyboard, assets: Iterable<Asset>): void {
+  const text = JSON.stringify(buildProjectFile(sb, assets), null, 2);
+  if (new Blob([text]).size > MAX_PROJECT_BYTES) {
+    throw new Error("Project JSON is larger than 25 MB. Remove or downscale images and try again.");
+  }
+  downloadText(text, `${slugify(sb.title)}.cutroom.json`, "application/json");
 }
 
-export interface ImportResult {
-  sb: Storyboard;
-  fixes: ValidationIssue[];
-}
+export type ImportResult = ParsedProject;
 
 export async function importStoryboardFile(file: File): Promise<ImportResult> {
+  if (file.size > MAX_PROJECT_BYTES) {
+    throw new Error(`"${file.name}" is larger than 25 MB. Remove or downscale images and try again.`);
+  }
   let text: string;
   try {
     text = await file.text();
@@ -244,6 +248,5 @@ export async function importStoryboardFile(file: File): Promise<ImportResult> {
   } catch (err) {
     throw new Error(`"${file.name}" is not valid JSON: ${err instanceof Error ? err.message : "parse error"}`);
   }
-  const { value, fixes } = sanitizeStoryboard(parsed);
-  return { sb: value, fixes };
+  return parseProjectFile(parsed);
 }

@@ -1,3 +1,4 @@
+import fs from "node:fs";
 import { expect, test, type Page } from "@playwright/test";
 
 test.describe("CUTROOM journey", () => {
@@ -107,6 +108,45 @@ test.describe("CUTROOM journey", () => {
     await page.getByRole("menuitem", { name: "Project JSON" }).click();
     const download = await downloadPromise;
     expect(download.suggestedFilename()).toMatch(/\.cutroom\.json$/);
+  });
+
+  test("project JSON carries uploaded images into a fresh profile", async ({ page, browser }) => {
+    await openFirstBoard(page);
+    const boardTitle = await page.getByLabel("Board title").inputValue();
+    const chooserPromise = page.waitForEvent("filechooser");
+    await page.getByRole("button", { name: /^Add an image/ }).click();
+    const chooser = await chooserPromise;
+    await chooser.setFiles({
+      name: "pixel.png",
+      mimeType: "image/png",
+      buffer: Buffer.from(
+        "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+/p9sAAAAASUVORK5CYII=",
+        "base64",
+      ),
+    });
+    await expect(page.locator("svg[aria-label^=\"Frame\"] image")).toHaveCount(1);
+
+    await page.getByRole("button", { name: "Export" }).click();
+    const downloadPromise = page.waitForEvent("download");
+    await page.getByRole("menuitem", { name: "Project JSON" }).click();
+    const download = await downloadPromise;
+    const jsonPath = await download.path();
+    const file = JSON.parse(fs.readFileSync(jsonPath, "utf8")) as {
+      schemaVersion: number;
+      assets: { dataUrl: string }[];
+    };
+    expect(file.schemaVersion).toBe(2);
+    expect(file.assets).toHaveLength(1);
+    expect(file.assets[0].dataUrl).toMatch(/^data:image\/png;base64,/);
+
+    const fresh = await browser.newContext();
+    const freshPage = await fresh.newPage();
+    await freshPage.goto(new URL(page.url()).origin);
+    await freshPage.locator('input[type="file"][accept*="json"]').setInputFiles(jsonPath);
+    await expect(freshPage.getByLabel("Board title")).toHaveValue(boardTitle);
+    await expect(freshPage.locator("svg[aria-label^=\"Frame\"] image")).toHaveCount(1);
+    await expect(freshPage.getByText("Image missing")).toHaveCount(0);
+    await fresh.close();
   });
 
   test("invalid JSON import explains itself; valid JSON round-trips", async ({ page }) => {
