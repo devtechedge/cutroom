@@ -6,7 +6,7 @@
   --bg-inset: #171513;
   --ink: #f2ede3;
   --ink-mid: #b9b1a1;
-  --ink-low: #847d6d;
+  --ink-low: #9a9382;
   --line: #3a362f;
   --line-strong: #4c473d;
   --paper: #f5f1e6;
@@ -16,7 +16,7 @@
   --signal-ink: #1c2005;
   --signal-dim: rgba(215, 240, 76, 0.16);
   --mark: #e8a13d;
-  --danger: #e06c4f;
+  --danger: #ef8a70;
   --danger-dim: rgba(224, 108, 79, 0.14);
   --focus: #d7f04c;
   --shadow: 0 12px 32px rgba(0, 0, 0, 0.45);

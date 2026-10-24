@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState, type JSX } from "react";
+import { useCallback, useEffect, useId, useRef, useState, type JSX } from "react";
 import { useEditor, EditorProvider } from "../state/editor";
 import * as ops from "../model/ops";
 import { newImageObject, newShapeObject, newTextObject, relayoutForAspect } from "../model/defaults";
@@ -25,6 +25,7 @@ export interface SaveStatus {
 
 export interface EditorProps {
   resolve: AssetResolver;
+  assets: Map<string, Asset>;
   onAddAsset: (asset: Asset) => void;
   onBack: () => void;
   onDelete: () => void;
@@ -51,7 +52,7 @@ function SaveStatusView({ status }: { status: SaveStatus }): JSX.Element {
   );
 }
 
-function EditorInner({ resolve, onAddAsset, onBack, onDelete, saveStatus, theme, onToggleTheme, persistent }: EditorProps): JSX.Element {
+function EditorInner({ resolve, assets, onAddAsset, onBack, onDelete, saveStatus, theme, onToggleTheme, persistent }: EditorProps): JSX.Element {
   const ed = useEditor();
   const { sb, frame, frameIndex, object } = ed;
   const [preview, setPreview] = useState(false);
@@ -63,7 +64,14 @@ function EditorInner({ resolve, onAddAsset, onBack, onDelete, saveStatus, theme,
   const [zoom, setZoom] = useState(1);
   const [exportMenu, setExportMenu] = useState(false);
   const [exporting, setExporting] = useState(false);
+  const exportMenuId = useId();
+  const exportTriggerRef = useRef<HTMLButtonElement>(null);
   const toastTimer = useRef<number | undefined>(undefined);
+
+  const closeExportMenu = useCallback((restoreFocus: boolean): void => {
+    setExportMenu(false);
+    if (restoreFocus) exportTriggerRef.current?.focus();
+  }, []);
 
   const showToast = useCallback((msg: string) => {
     setToast(msg);
@@ -158,8 +166,8 @@ function EditorInner({ resolve, onAddAsset, onBack, onDelete, saveStatus, theme,
     setExporting(true);
     try {
       if (kind === "json") {
-        exportProjectJson(sb);
-        showToast("Project JSON downloaded. It embeds image data, so it can be re-imported anywhere.");
+        exportProjectJson(sb, assets.values());
+        showToast("Project JSON downloaded with its images, so it can be re-imported anywhere.");
       } else if (kind === "sheet-png") {
         const pages = await exportSheetPng(sb, resolve);
         showToast(`Contact sheet exported (${pages} page${pages === 1 ? "" : "s"}, PNG).`);
@@ -186,7 +194,8 @@ function EditorInner({ resolve, onAddAsset, onBack, onDelete, saveStatus, theme,
   };
 
   return (
-    <div className="editor">
+    <main className="editor">
+      <h1 className="visually-hidden">{sb.title || "Untitled board"}</h1>
       <header className="app-header">
         <button type="button" className="icon-btn" onClick={onBack} aria-label="Back to gallery" title="Back to gallery">
           <Icon name="move-left" />
@@ -211,12 +220,24 @@ function EditorInner({ resolve, onAddAsset, onBack, onDelete, saveStatus, theme,
           <Icon name="redo" />
         </button>
         <span style={{ position: "relative", display: "inline-flex" }}>
-          <button type="button" className="btn small" aria-haspopup="menu" aria-expanded={exportMenu} data-pressed={exportMenu} disabled={exporting} onClick={() => setExportMenu((v) => !v)}>
+          <button
+            ref={exportTriggerRef}
+            type="button"
+            className="btn small"
+            aria-label="Export"
+            aria-haspopup="menu"
+            aria-expanded={exportMenu}
+            aria-controls={exportMenu ? exportMenuId : undefined}
+            data-pressed={exportMenu}
+            disabled={exporting}
+            onClick={() => setExportMenu((v) => !v)}
+          >
             <Icon name="download" size={14} />
             <span className="hide-mobile">Export</span>
           </button>
           {exportMenu && (
             <Menu
+              id={exportMenuId}
               align="right"
               label="Export"
               items={[
@@ -225,7 +246,7 @@ function EditorInner({ resolve, onAddAsset, onBack, onDelete, saveStatus, theme,
                 { label: `Current frame (PNG)`, disabled: !frame, onSelect: () => void runExport("frame-png") },
                 { label: "Project JSON", separatorBefore: true, onSelect: () => void runExport("json") },
               ]}
-              onClose={() => setExportMenu(false)}
+              onClose={closeExportMenu}
             />
           )}
         </span>
@@ -236,6 +257,7 @@ function EditorInner({ resolve, onAddAsset, onBack, onDelete, saveStatus, theme,
         <MenuButton
           icon={<Icon name="sliders" />}
           label=""
+          ariaLabel="Board menu"
           align="right"
           items={[
             { label: "Board settings", onSelect: () => setBoardDialog(true) },
@@ -282,7 +304,7 @@ function EditorInner({ resolve, onAddAsset, onBack, onDelete, saveStatus, theme,
             <span className="sep" aria-hidden="true" />
             <button
               type="button"
-              className="icon-btn"
+              className="icon-btn stage-guides"
               aria-pressed={frame?.guides ?? false}
               aria-label="Framing guides"
               title="Rule-of-thirds and safe area (editor only)"
@@ -380,7 +402,7 @@ function EditorInner({ resolve, onAddAsset, onBack, onDelete, saveStatus, theme,
 
       <Toast message={toast} />
       <LiveStatus message={object ? `Selected ${object.kind}` : frame ? `Frame ${frameNumber(frameIndex)} of ${sb.frames.length}` : ""} />
-    </div>
+    </main>
   );
 }
 

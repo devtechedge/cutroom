@@ -103,8 +103,8 @@ button {
   align-items: center;
   justify-content: center;
   gap: 6px;
-  min-width: 32px;
-  height: 32px;
+  min-width: 36px;
+  height: 36px;
   padding: 0 7px;
   background: transparent;
   border: 1px solid transparent;
@@ -131,7 +131,7 @@ button {
   align-items: center;
   justify-content: center;
   gap: 8px;
-  height: 34px;
+  height: 36px;
   padding: 0 14px;
   background: var(--bg-raised);
   border: 1px solid var(--line-strong);
@@ -165,7 +165,7 @@ button {
   background: var(--danger-dim);
 }
 .btn.small {
-  height: 28px;
+  height: 36px;
   padding: 0 10px;
   font-size: 13px;
 }
@@ -229,7 +229,7 @@ button {
   border: none;
   border-right: 1px solid var(--line-strong);
   color: var(--ink-mid);
-  height: 30px;
+  height: 36px;
   padding: 0 11px;
   font-size: 12.5px;
 }
@@ -853,8 +853,8 @@ input[type="color"] {
   display: inline-flex;
 }
 .frame-card .card-actions .icon-btn {
-  min-width: 24px;
-  height: 24px;
+  min-width: 36px;
+  height: 36px;
 }
 
 .insert-marker {
@@ -1049,6 +1049,7 @@ input[type="color"] {
   background: transparent;
   border: none;
   border-radius: 6px;
+  min-height: 36px;
   padding: 8px 10px;
   text-align: left;
   color: var(--ink);
@@ -1281,5 +1282,16 @@ input[type="color"] {
     transition-duration: 0.01ms !important;
     animation-duration: 0.01ms !important;
     animation-iteration-count: 1 !important;
+  }
+}
+
+@media (max-width: 1023px) {
+  .stage-toolbar {
+    gap: 2px;
+    padding: 6px 8px;
+  }
+  .stage-toolbar .sep,
+  .stage-toolbar .stage-guides {
+    display: none;
   }
 }

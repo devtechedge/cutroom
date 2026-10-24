@@ -34,6 +34,61 @@ test.describe("responsive", () => {
     await expect(aside).toHaveAttribute("data-open", "false");
   });
 
+  test("boots in the stored theme before the app script loads", async ({ page }) => {
+    await page.addInitScript(() => {
+      try {
+        localStorage.setItem("cutroom-theme", "light");
+      } catch {
+        // ignore storage failures in the test shim
+      }
+    });
+    await page.route("**/*.js", async (route) => {
+      await route.abort();
+    });
+    await page.goto("/", { waitUntil: "commit" });
+    await expect(page.locator("html")).toHaveAttribute("data-theme", "light");
+    await expect(page.locator(".boot-shell")).toBeVisible();
+    const background = await page.evaluate(() => getComputedStyle(document.body).backgroundColor);
+    expect(background).toBe("rgb(239, 233, 219)");
+    await expect(page.getByRole("heading", { level: 1 })).toHaveCount(0);
+  });
+
+  test("menus support arrow keys and return focus", async ({ page }) => {
+    await page.goto("/");
+    const trigger = page.getByRole("button", { name: "Board actions" }).first();
+    await trigger.click();
+    await expect(page.getByRole("menu")).toBeVisible();
+    await expect(page.getByRole("menuitem", { name: "Rename" })).toBeFocused();
+    await page.keyboard.press("ArrowDown");
+    await expect(page.getByRole("menuitem", { name: "Duplicate" })).toBeFocused();
+    await page.keyboard.press("Escape");
+    await expect(page.getByRole("menu")).toHaveCount(0);
+    await expect(trigger).toBeFocused();
+    await trigger.click();
+    await page.keyboard.press("Tab");
+    await expect(page.getByRole("menu")).toHaveCount(0);
+    await expect(trigger).toBeFocused();
+  });
+
+  test("menu-opened dialogs return focus to the trigger", async ({ page }) => {
+    await page.goto("/");
+    const boardActions = page.getByRole("button", { name: "Board actions" }).first();
+    await boardActions.click();
+    await page.getByRole("menuitem", { name: "Delete board" }).click();
+    const dialog = page.getByRole("alertdialog");
+    await expect(dialog).toBeVisible();
+    await dialog.getByRole("button", { name: "Cancel" }).click();
+    await expect(boardActions).toBeFocused();
+
+    await page.getByRole("button", { name: /^Open board / }).first().click();
+    const boardMenu = page.getByRole("button", { name: "Board menu" });
+    await boardMenu.click();
+    await page.getByRole("menuitem", { name: "Keyboard shortcuts" }).click();
+    await expect(page.getByRole("dialog")).toBeVisible();
+    await page.keyboard.press("Escape");
+    await expect(boardMenu).toBeFocused();
+  });
+
   test("theme choice persists across reload", async ({ page }) => {
     await page.goto("/");
     await page.getByRole("button", { name: "Switch to light theme" }).click();

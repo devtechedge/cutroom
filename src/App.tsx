@@ -1,10 +1,12 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type JSX } from "react";
 import type { Asset, Storyboard } from "./model/types";
 import { duplicateStoryboard } from "./model/ops";
+import { newId } from "./model/ids";
 import { estimateUsage, loadLibrary, saveAssetRecord, saveProject, deleteProjectRecord, deleteAssetRecord } from "./persist/store";
 import type { SimpleDB } from "./persist/db";
 import type { AssetResolver } from "./render/primitives";
 import { exportProjectJson, importStoryboardFile } from "./export/exporters";
+import { remapAssetIds } from "./export/projectfile";
 import { formatBytes } from "./lib/format";
 import { Gallery } from "./components/Gallery";
 import { Editor, type SaveStatus } from "./components/Editor";
@@ -16,6 +18,23 @@ type Theme = "dark" | "light";
 type Route = { name: "gallery" } | { name: "editor"; id: string };
 
 const AUTOSAVE_MS = 600;
+const SEEDED_KEY = "cutroom-seeded";
+
+function hasSeeded(): boolean {
+  try {
+    return localStorage.getItem(SEEDED_KEY) === "1";
+  } catch {
+    return false;
+  }
+}
+
+function markSeeded(): void {
+  try {
+    localStorage.setItem(SEEDED_KEY, "1");
+  } catch {
+    // seeding stays best-effort when storage is blocked
+  }
+}
 
 function loadTheme(): Theme {
   try {
@@ -39,7 +58,7 @@ export default function App(): JSX.Element {
   const [saveStatus, setSaveStatus] = useState<SaveStatus>({ state: "saved", at: null });
   const [showNew, setShowNew] = useState(false);
   const [toast, setToast] = useState<string | null>(null);
-  const [importIssues, setImportIssues] = useState<{ title: string; issues: string[] } | null>(null);
+  const [importIssues, setImportIssues] = useState<{ title: string; issues: string[]; failed: boolean } | null>(null);
   const toastTimer = useRef<number | undefined>(undefined);
   const saveTimer = useRef<number | undefined>(undefined);
   const pendingSaves = useRef<Map<string, Storyboard>>(new Map());
@@ -56,6 +75,9 @@ export default function App(): JSX.Element {
 
   useEffect(() => {
     document.documentElement.dataset.theme = theme;
+    document.documentElement.style.colorScheme = theme;
+    const meta = document.querySelector('meta[name="theme-color"]');
+    if (meta) meta.setAttribute("content", theme === "light" ? "#efe9db" : "#1d1b18");
     try {
       localStorage.setItem("cutroom-theme", theme);
     } catch {
@@ -69,13 +91,15 @@ export default function App(): JSX.Element {
     void (async () => {
       const lib = await loadLibrary();
       if (!life.alive) return;
+      const hadProjects = lib.projects.length > 0;
       let list = lib.projects;
       let seeded = false;
-      if (list.length === 0) {
+      if (list.length === 0 && !hasSeeded()) {
         const { buildStarterLibrary } = await import("./model/starters");
         list = buildStarterLibrary();
         seeded = true;
       }
+      if (hadProjects && lib.persistent) markSeeded();
       setDb(lib.db);
       setPersistent(lib.persistent);
       setWarning(lib.warning);
@@ -83,7 +107,11 @@ export default function App(): JSX.Element {
       setProjects(list);
       setBooted(true);
       if (seeded) {
-        for (const sb of list) void saveProject(lib.db, sb);
+        void Promise.all(list.map((sb) => saveProject(lib.db, sb)))
+          .then(() => {
+            if (lib.persistent) markSeeded();
+          })
+          .catch(() => undefined);
       }
       // drop assets no project references anymore
       try {
@@ -221,30 +249,75 @@ export default function App(): JSX.Element {
     showToast(`Duplicated as “${copy.title}”.`);
   };
 
+  const restoreStarters = useCallback(async (): Promise<void> => {
+    const { buildStarterLibrary } = await import("./model/starters");
+    const starters = buildStarterLibrary();
+    for (const starter of starters) {
+      upsertProject(starter);
+      if (db) void saveProject(db, starter).catch(() => undefined);
+    }
+    if (persistent) markSeeded();
+    showToast("Starter boards restored.");
+  }, [db, persistent, showToast, upsertProject]);
+
   const importProject = async (file: File): Promise<void> => {
     try {
-      const { sb, fixes } = await importStoryboardFile(file);
-      const exists = projects.some((p) => p.id === sb.id);
-      const imported = exists ? { ...sb, id: `${sb.id}-${Math.random().toString(36).slice(2, 6)}` } : sb;
+      const { sb, assets: importedAssets, fixes } = await importStoryboardFile(file);
+      let board = sb;
+      if (importedAssets.length > 0) {
+        const mapping = new Map<string, string>();
+        const copies = importedAssets.map((asset) => ({ ...asset, id: newId(), addedAt: Date.now() }));
+        importedAssets.forEach((asset, index) => mapping.set(asset.id, copies[index].id));
+        board = remapAssetIds(board, mapping);
+        setAssets((prev) => {
+          const next = new Map(prev);
+          for (const asset of copies) next.set(asset.id, asset);
+          return next;
+        });
+        if (db) {
+          for (const asset of copies) {
+            void saveAssetRecord(db, asset).catch(() => showToast("An imported image could not be stored; it will work until this tab closes."));
+          }
+        }
+      }
+      const exists = projects.some((p) => p.id === board.id);
+      const imported = exists ? { ...board, id: `${board.id}-${Math.random().toString(36).slice(2, 6)}` } : board;
       upsertProject(imported);
       if (db) void saveProject(db, imported).catch(() => undefined);
       if (fixes.length > 0) {
-        setImportIssues({ title: imported.title, issues: fixes.map((f) => `${f.path}: ${f.message}`) });
+        setImportIssues({ title: imported.title, issues: fixes.map((f) => `${f.path}: ${f.message}`), failed: false });
       } else {
         showToast(`Imported “${imported.title}”.`);
       }
       setRoute({ name: "editor", id: imported.id });
     } catch (err) {
-      setImportIssues({ title: file.name, issues: [err instanceof Error ? err.message : "The file could not be read as a CUTROOM project."] });
+      setImportIssues({ title: file.name, issues: [err instanceof Error ? err.message : "The file could not be read as a CUTROOM project."], failed: true });
     }
   };
+
+  const exportJson = useCallback(
+    (project: Storyboard): void => {
+      try {
+        exportProjectJson(project, assets.values());
+        showToast("Project JSON downloaded with its images.");
+      } catch (err) {
+        showToast(err instanceof Error ? err.message : "Project export failed.");
+      }
+    },
+    [assets, showToast],
+  );
 
   const current = route.name === "editor" ? projects.find((p) => p.id === route.id) : undefined;
 
   const editorCommit = useMemo(() => (sb: Storyboard) => commitProject(sb), [commitProject]);
 
   if (!booted) {
-    return <div style={{ minHeight: "100vh" }} aria-busy="true" />;
+    return (
+      <div className="boot-shell" role="status" aria-live="polite">
+        <div className="boot-wordmark">CUTROOM</div>
+        <div className="boot-line">Loading your boards</div>
+      </div>
+    );
   }
 
   return (
@@ -262,10 +335,11 @@ export default function App(): JSX.Element {
           onDuplicate={duplicateProject}
           onExportJson={(id) => {
             const p = projects.find((x) => x.id === id);
-            if (p) exportProjectJson(p);
+            if (p) exportJson(p);
           }}
           onDelete={deleteProject}
           onImport={(file) => void importProject(file)}
+          onRestoreStarters={() => void restoreStarters()}
           persistent={persistent}
           theme={theme}
           onToggleTheme={() => setTheme((t) => (t === "dark" ? "light" : "dark"))}
@@ -276,6 +350,7 @@ export default function App(): JSX.Element {
           project={current}
           onCommit={editorCommit}
           resolve={resolve}
+          assets={assets}
           onAddAsset={addAsset}
           onBack={() => setRoute({ name: "gallery" })}
           onDelete={() => deleteProject(current.id)}
@@ -299,11 +374,11 @@ export default function App(): JSX.Element {
       {showNew && <NewProjectDialog onClose={() => setShowNew(false)} onCreate={createProject} />}
 
       {importIssues && (
-        <Dialog title={importIssues.issues.length === 1 && /not valid JSON|does not contain|Unsupported project version/i.test(importIssues.issues[0]) ? "Import failed" : "Imported with fixes"} onClose={() => setImportIssues(null)}>
+        <Dialog title={importIssues.failed ? "Import failed" : "Imported with fixes"} onClose={() => setImportIssues(null)}>
           <p style={{ margin: 0 }}>
             <strong>{importIssues.title}</strong>
           </p>
-          {importIssues.issues.length === 1 && /not valid JSON|does not contain|Unsupported project version/i.test(importIssues.issues[0]) ? (
+          {importIssues.failed ? (
             <p style={{ margin: 0 }}>{importIssues.issues[0]}</p>
           ) : (
             <ul className="issue-list">

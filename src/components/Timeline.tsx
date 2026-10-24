@@ -4,7 +4,7 @@ import * as ops from "../model/ops";
 import { newFrame } from "../model/defaults";
 import { frameNumber, formatSeconds } from "../model/geometry";
 import type { AssetResolver } from "../render/primitives";
-import { FrameArtView } from "./FrameView";
+import { FrameImageView } from "./FrameView";
 import { Icon } from "./Icon";
 import { LiveStatus } from "./ui";
 
@@ -220,7 +220,7 @@ export function Timeline({ resolve }: TimelineProps): JSX.Element {
                 onPointerDown={(e) => onCardPointerDown(e, i)}
                 onClick={() => selectIndex(i)}
               >
-                <FrameArtView frame={f} aspect={sb.aspect} resolve={resolve} />
+                <FrameImageView frame={f} aspect={sb.aspect} resolve={resolve} />
               </button>
               <div className="card-meta">
                 <span className="card-num">{frameNumber(i)}</span>

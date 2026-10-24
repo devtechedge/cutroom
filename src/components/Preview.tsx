@@ -7,6 +7,8 @@ import { FrameArtView } from "./FrameView";
 import { Icon } from "./Icon";
 import { Backdrop, LiveStatus } from "./ui";
 
+/* eslint-disable jsx-a11y/no-noninteractive-tabindex -- the scrollable preview stage must be focusable */
+
 const FOCUSABLE = 'a[href], button:not([disabled]), input:not([disabled]), select:not([disabled]), [tabindex]:not([tabindex="-1"])';
 
 export interface PreviewProps {
@@ -181,7 +183,7 @@ export function Preview({ resolve, onClose }: PreviewProps): JSX.Element {
             <Icon name="close" />
           </button>
         </div>
-        <div className="preview-stage scroll-hover">
+        <div className="preview-stage scroll-hover" tabIndex={0} role="region" aria-label="Preview stage">
           <div className="preview-frame-holder" ref={holderRef} style={{ width: Math.round(artWidth), height: Math.round(artHeight) }}>
             <FrameArtView frame={frame} aspect={sb.aspect} resolve={resolve} title={`Preview frame ${frameNumber(index)}`} />
             {overlay && (
