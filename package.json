@@ -3,7 +3,7 @@
   "private": true,
   "version": "0.1.0",
   "type": "module",
-  "description": "CUTROOM — a cinematic storyboard and visual narrative studio: frames, rhythm, and presentation-ready exports.",
+  "description": "CUTROOM: a cinematic storyboard and visual narrative studio for frames, rhythm, and presentation-ready exports.",
   "scripts": {
     "dev": "vite",
     "build": "tsc --noEmit && vite build",

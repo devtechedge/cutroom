@@ -164,7 +164,7 @@ export function Inspector({ open, onAddAsset, onToast }: InspectorProps): JSX.El
               <Num label="H" value={object.h} min={0} max={1000} onValue={(v) => runObject("edit-geometry", { h: v })} />
             </div>
 
-            <Field label={`Opacity — ${Math.round(object.opacity * 100)}%`}>
+            <Field label={`Opacity (${Math.round(object.opacity * 100)}%)`}>
               <input
                 type="range"
                 min={0}
@@ -288,7 +288,7 @@ export function Inspector({ open, onAddAsset, onToast }: InspectorProps): JSX.El
             <div className="field-grid">
               <Field label="Shot type">
                 <select value={frame.shot} onChange={(e) => runFrame("edit-shot", { shot: e.target.value as typeof frame.shot })}>
-                  <option value="">— none —</option>
+                  <option value="">None</option>
                   {SHOT_TYPES.map((s) => (
                     <option key={s} value={s}>
                       {s}

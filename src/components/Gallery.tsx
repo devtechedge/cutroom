@@ -185,7 +185,7 @@ export function Gallery(props: GalleryProps): ReactNode {
         <div className="gallery-meta-row mono">
           <span>{projects.length} board{projects.length === 1 ? "" : "s"}</span>
           <span aria-hidden="true">·</span>
-          <span>{persistent ? "autosaves to this browser — nothing leaves your machine" : "storage unavailable — this session is memory-only"}</span>
+          <span>{persistent ? "autosaves to this browser, nothing leaves your machine" : "storage unavailable, this session is memory-only"}</span>
         </div>
 
         {sorted.length === 0 ? (

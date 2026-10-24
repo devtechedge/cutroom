@@ -1,5 +1,5 @@
 export function formatWhen(ts: number): string {
-  if (!Number.isFinite(ts) || ts <= 0) return "—";
+  if (!Number.isFinite(ts) || ts <= 0) return "-";
   const d = new Date(ts);
   const now = new Date();
   const sameDay = d.toDateString() === now.toDateString();
