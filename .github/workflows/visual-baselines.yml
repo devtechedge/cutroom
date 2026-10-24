@@ -1,8 +1,6 @@
 name: Visual baselines
 
 on:
-  push:
-    branches: [v1.2-p2-product]
   workflow_dispatch:
 
 permissions:

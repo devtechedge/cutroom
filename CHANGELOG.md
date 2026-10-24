@@ -12,6 +12,7 @@
 - A backup reminder when boards exist and no backup has been downloaded.
 - Public pages for welcome, privacy, terms and contact, plus a product and roadmap doc set.
 - A custom domain migration plan that accounts for origin-scoped IndexedDB.
+- Linux pixel baselines for the stage, print sheet and welcome page, with a workflow to refresh them.
 
 ### Changed
 
