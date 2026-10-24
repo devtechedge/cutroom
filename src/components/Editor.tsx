@@ -303,7 +303,7 @@ function EditorInner({ resolve, assets, onAddAsset, onBack, onDelete, saveStatus
             <span className="sep" aria-hidden="true" />
             <button
               type="button"
-              className="icon-btn"
+              className="icon-btn stage-guides"
               aria-pressed={frame?.guides ?? false}
               aria-label="Framing guides"
               title="Rule-of-thirds and safe area (editor only)"

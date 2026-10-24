@@ -1283,3 +1283,14 @@ input[type="color"] {
     animation-iteration-count: 1 !important;
   }
 }
+
+@media (max-width: 1023px) {
+  .stage-toolbar {
+    gap: 2px;
+    padding: 6px 8px;
+  }
+  .stage-toolbar .sep,
+  .stage-toolbar .stage-guides {
+    display: none;
+  }
+}
