@@ -15,5 +15,21 @@ export default defineConfig({
   test: {
     include: ["tests/unit/**/*.test.ts"],
     environment: "node",
+    coverage: {
+      provider: "v8",
+      reporter: ["text", "json-summary"],
+      include: [
+        "src/model/defaults.ts",
+        "src/model/geometry.ts",
+        "src/model/ops.ts",
+        "src/model/palette.ts",
+        "src/model/validate.ts",
+        "src/export/contactsheet.ts",
+        "src/export/projectfile.ts",
+        "src/render/primitives.ts",
+        "src/state/history.ts",
+      ],
+      thresholds: { lines: 85, functions: 80, branches: 70, statements: 85 },
+    },
   },
 });

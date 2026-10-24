@@ -18,6 +18,10 @@ CUTROOM is a client-only creative tool. There is no server, no account system, a
 
 - No API routes, no cookies, no auth, no CORS surface, no server secrets and no payment flow.
 
+## Headers
+
+- The production build sends a strict Content-Security-Policy, X-Content-Type-Options, Referrer-Policy, Permissions-Policy and X-Frame-Options. Inline scripts are allowed by SHA-256 hash.
+
 ## Residual risks
 
 - Anyone with access to the visitor's browser profile can read the stored boards; treat IndexedDB as non-confidential local storage and export/delete boards you do not want to keep on a shared machine.

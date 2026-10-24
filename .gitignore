@@ -10,3 +10,5 @@ qa-shots
 .vercel
 .env*
 .env.local
+
+coverage

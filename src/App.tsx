@@ -1,7 +1,8 @@
-import { useCallback, useEffect, useMemo, useRef, useState, type JSX } from "react";
+import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState, type JSX } from "react";
 import type { Asset, Storyboard } from "./model/types";
 import { duplicateStoryboard } from "./model/ops";
 import { newId } from "./model/ids";
+import { buildStarterLibrary } from "./model/starters";
 import { estimateUsage, loadLibrary, saveAssetRecord, saveProject, deleteProjectRecord, deleteAssetRecord } from "./persist/store";
 import type { SimpleDB } from "./persist/db";
 import type { AssetResolver } from "./render/primitives";
@@ -9,16 +10,42 @@ import { exportProjectJson, importStoryboardFile } from "./export/exporters";
 import { remapAssetIds } from "./export/projectfile";
 import { formatBytes } from "./lib/format";
 import { Gallery } from "./components/Gallery";
-import { Editor, type SaveStatus } from "./components/Editor";
+import type { SaveStatus } from "./components/Editor";
 import { NewProjectDialog } from "./components/NewProjectDialog";
 import { Dialog, Toast } from "./components/ui";
 import { Icon } from "./components/Icon";
+
+const Editor = lazy(() => import("./components/Editor").then((module) => ({ default: module.Editor })));
 
 type Theme = "dark" | "light";
 type Route = { name: "gallery" } | { name: "editor"; id: string };
 
 const AUTOSAVE_MS = 600;
 const SEEDED_KEY = "cutroom-seeded";
+const GALLERY_TITLE = "CUTROOM: storyboard and visual narrative studio";
+
+function readRoute(): Route {
+  const match = /^#\/board\/([^/?#]+)/.exec(window.location.hash);
+  if (!match) return { name: "gallery" };
+  try {
+    return { name: "editor", id: decodeURIComponent(match[1]) };
+  } catch {
+    return { name: "gallery" };
+  }
+}
+
+function hashFor(route: Route): string {
+  return route.name === "editor" ? `#/board/${encodeURIComponent(route.id)}` : "#/";
+}
+
+function BootShell({ line }: { line: string }): JSX.Element {
+  return (
+    <div className="boot-shell" role="status" aria-live="polite">
+      <div className="boot-wordmark">CUTROOM</div>
+      <div className="boot-line">{line}</div>
+    </div>
+  );
+}
 
 function hasSeeded(): boolean {
   try {
@@ -47,7 +74,7 @@ function loadTheme(): Theme {
 
 export default function App(): JSX.Element {
   const [theme, setTheme] = useState<Theme>(loadTheme);
-  const [route, setRoute] = useState<Route>({ name: "gallery" });
+  const [route, setRoute] = useState<Route>(readRoute);
   const [projects, setProjects] = useState<Storyboard[]>([]);
   const [assets, setAssets] = useState<Map<string, Asset>>(new Map());
   const [db, setDb] = useState<SimpleDB | null>(null);
@@ -55,6 +82,7 @@ export default function App(): JSX.Element {
   const [warning, setWarning] = useState<string | null>(null);
   const [dismissed, setDismissed] = useState(false);
   const [booted, setBooted] = useState(false);
+  const [bootError, setBootError] = useState<string | null>(null);
   const [saveStatus, setSaveStatus] = useState<SaveStatus>({ state: "saved", at: null });
   const [showNew, setShowNew] = useState(false);
   const [toast, setToast] = useState<string | null>(null);
@@ -73,6 +101,25 @@ export default function App(): JSX.Element {
     toastTimer.current = window.setTimeout(() => setToast(null), 4200);
   }, []);
 
+  const navigate = useCallback((next: Route, replace = false): void => {
+    const hash = hashFor(next);
+    if (window.location.hash !== hash) {
+      if (replace) window.history.replaceState(null, "", hash);
+      else window.history.pushState(null, "", hash);
+    }
+    setRoute(next);
+  }, []);
+
+  useEffect(() => {
+    const onRoute = (): void => setRoute(readRoute());
+    window.addEventListener("hashchange", onRoute);
+    window.addEventListener("popstate", onRoute);
+    return () => {
+      window.removeEventListener("hashchange", onRoute);
+      window.removeEventListener("popstate", onRoute);
+    };
+  }, []);
+
   useEffect(() => {
     document.documentElement.dataset.theme = theme;
     document.documentElement.style.colorScheme = theme;
@@ -89,46 +136,51 @@ export default function App(): JSX.Element {
   useEffect(() => {
     const life = { alive: true };
     void (async () => {
-      const lib = await loadLibrary();
-      if (!life.alive) return;
-      const hadProjects = lib.projects.length > 0;
-      let list = lib.projects;
-      let seeded = false;
-      if (list.length === 0 && !hasSeeded()) {
-        const { buildStarterLibrary } = await import("./model/starters");
-        list = buildStarterLibrary();
-        seeded = true;
-      }
-      if (hadProjects && lib.persistent) markSeeded();
-      setDb(lib.db);
-      setPersistent(lib.persistent);
-      setWarning(lib.warning);
-      setAssets(lib.assets);
-      setProjects(list);
-      setBooted(true);
-      if (seeded) {
-        void Promise.all(list.map((sb) => saveProject(lib.db, sb)))
-          .then(() => {
-            if (lib.persistent) markSeeded();
-          })
-          .catch(() => undefined);
-      }
-      // drop assets no project references anymore
       try {
-        const referenced = new Set<string>();
-        for (const sb of list) for (const f of sb.frames) for (const o of f.objects) if (o.kind === "image") referenced.add(o.assetId);
-        for (const asset of lib.assets.values()) {
-          if (!referenced.has(asset.id)) {
-            await deleteAssetRecord(lib.db, asset.id);
-            setAssets((prev) => {
-              const next = new Map(prev);
-              next.delete(asset.id);
-              return next;
-            });
-          }
+        const lib = await loadLibrary();
+        if (!life.alive) return;
+        const hadProjects = lib.projects.length > 0;
+        let list = lib.projects;
+        let seeded = false;
+        if (list.length === 0 && !hasSeeded()) {
+          list = buildStarterLibrary();
+          seeded = true;
         }
-      } catch {
-        // GC is best-effort
+        if (hadProjects && lib.persistent) markSeeded();
+        setDb(lib.db);
+        setPersistent(lib.persistent);
+        setWarning(lib.warning);
+        setAssets(lib.assets);
+        setProjects(list);
+        setBooted(true);
+        if (seeded) {
+          void Promise.all(list.map((sb) => saveProject(lib.db, sb)))
+            .then(() => {
+              if (lib.persistent) markSeeded();
+            })
+            .catch(() => undefined);
+        }
+        // drop assets no project references anymore
+        try {
+          const referenced = new Set<string>();
+          for (const sb of list) for (const f of sb.frames) for (const o of f.objects) if (o.kind === "image") referenced.add(o.assetId);
+          for (const asset of lib.assets.values()) {
+            if (!referenced.has(asset.id)) {
+              await deleteAssetRecord(lib.db, asset.id);
+              setAssets((prev) => {
+                const next = new Map(prev);
+                next.delete(asset.id);
+                return next;
+              });
+            }
+          }
+        } catch {
+          // GC is best-effort
+        }
+      } catch (err) {
+        if (!life.alive) return;
+        setBootError(err instanceof Error ? err.message : "CUTROOM could not open its local library.");
+        setBooted(true);
       }
     })();
     return () => {
@@ -158,6 +210,16 @@ export default function App(): JSX.Element {
       document.removeEventListener("visibilitychange", onVis);
     };
   }, [db]);
+
+  const savePending = saveStatus.state === "saving" || saveStatus.state === "error";
+  useEffect(() => {
+    if (!savePending) return;
+    const warn = (event: BeforeUnloadEvent): void => {
+      event.preventDefault();
+    };
+    window.addEventListener("beforeunload", warn);
+    return () => window.removeEventListener("beforeunload", warn);
+  }, [savePending]);
 
   const upsertProject = useCallback((sb: Storyboard) => {
     setProjects((prev) => {
@@ -229,14 +291,14 @@ export default function App(): JSX.Element {
     upsertProject(sb);
     if (db) void saveProject(db, sb).catch(() => undefined);
     setShowNew(false);
-    setRoute({ name: "editor", id: sb.id });
+    navigate({ name: "editor", id: sb.id });
   };
 
   const deleteProject = (id: string): void => {
     setProjects((prev) => prev.filter((p) => p.id !== id));
     pendingSaves.current.delete(id);
     if (db) void deleteProjectRecord(db, id).catch(() => undefined);
-    setRoute({ name: "gallery" });
+    navigate({ name: "gallery" });
     showToast("Board deleted. Orphaned images are cleaned up next time the app starts.");
   };
 
@@ -249,8 +311,7 @@ export default function App(): JSX.Element {
     showToast(`Duplicated as “${copy.title}”.`);
   };
 
-  const restoreStarters = useCallback(async (): Promise<void> => {
-    const { buildStarterLibrary } = await import("./model/starters");
+  const restoreStarters = useCallback((): void => {
     const starters = buildStarterLibrary();
     for (const starter of starters) {
       upsertProject(starter);
@@ -289,12 +350,11 @@ export default function App(): JSX.Element {
       } else {
         showToast(`Imported “${imported.title}”.`);
       }
-      setRoute({ name: "editor", id: imported.id });
+      navigate({ name: "editor", id: imported.id });
     } catch (err) {
       setImportIssues({ title: file.name, issues: [err instanceof Error ? err.message : "The file could not be read as a CUTROOM project."], failed: true });
     }
   };
-
   const exportJson = useCallback(
     (project: Storyboard): void => {
       try {
@@ -309,15 +369,48 @@ export default function App(): JSX.Element {
 
   const current = route.name === "editor" ? projects.find((p) => p.id === route.id) : undefined;
 
+  useEffect(() => {
+    document.title = route.name === "editor" && current ? `${current.title} - CUTROOM` : GALLERY_TITLE;
+  }, [current, route.name]);
+
+  useEffect(() => {
+    if (!booted) return;
+    if (route.name === "editor" && !current) {
+      window.history.replaceState(null, "", "#/");
+    }
+  }, [booted, current, route.name]);
+
+  const currentId = current?.id;
+  useEffect(() => {
+    if (route.name !== "editor" || !currentId || typeof BroadcastChannel === "undefined") return;
+    const channel = new BroadcastChannel("cutroom-tabs");
+    const tabId = Math.random().toString(36).slice(2);
+    channel.onmessage = (event: MessageEvent<{ type?: string; id?: string; tabId?: string }>) => {
+      if (event.data.type === "open" && event.data.id === currentId && event.data.tabId !== tabId) {
+        showToast("This board is open in another tab. Changes may overwrite each other.");
+      }
+    };
+    channel.postMessage({ type: "open", id: currentId, tabId });
+    return () => channel.close();
+  }, [currentId, route.name, showToast]);
+
   const editorCommit = useMemo(() => (sb: Storyboard) => commitProject(sb), [commitProject]);
 
-  if (!booted) {
+  if (bootError) {
     return (
-      <div className="boot-shell" role="status" aria-live="polite">
+      <div className="boot-shell" role="alert">
         <div className="boot-wordmark">CUTROOM</div>
-        <div className="boot-line">Loading your boards</div>
+        <div className="boot-line">Your local library could not be opened.</div>
+        <div className="boot-line" style={{ maxWidth: 420 }}>{bootError}</div>
+        <button type="button" className="btn primary" onClick={() => window.location.reload()}>
+          Reload CUTROOM
+        </button>
       </div>
     );
+  }
+
+  if (!booted) {
+    return <BootShell line="Loading your boards" />;
   }
 
   return (
@@ -327,7 +420,7 @@ export default function App(): JSX.Element {
           projects={projects}
           resolve={resolve}
           onCreate={() => setShowNew(true)}
-          onOpen={(id) => setRoute({ name: "editor", id })}
+          onOpen={(id) => navigate({ name: "editor", id })}
           onRename={(id, title) => {
             const p = projects.find((x) => x.id === id);
             if (p) commitProject({ ...p, title, updatedAt: Date.now() });
@@ -339,26 +432,28 @@ export default function App(): JSX.Element {
           }}
           onDelete={deleteProject}
           onImport={(file) => void importProject(file)}
-          onRestoreStarters={() => void restoreStarters()}
+          onRestoreStarters={restoreStarters}
           persistent={persistent}
           theme={theme}
           onToggleTheme={() => setTheme((t) => (t === "dark" ? "light" : "dark"))}
         />
       ) : (
-        <Editor
-          key={current.id}
-          project={current}
-          onCommit={editorCommit}
-          resolve={resolve}
-          assets={assets}
-          onAddAsset={addAsset}
-          onBack={() => setRoute({ name: "gallery" })}
-          onDelete={() => deleteProject(current.id)}
-          saveStatus={saveStatus}
-          theme={theme}
-          onToggleTheme={() => setTheme((t) => (t === "dark" ? "light" : "dark"))}
-          persistent={persistent}
-        />
+        <Suspense fallback={<BootShell line="Opening the cutting room" />}>
+          <Editor
+            key={current.id}
+            project={current}
+            onCommit={editorCommit}
+            resolve={resolve}
+            assets={assets}
+            onAddAsset={addAsset}
+            onBack={() => navigate({ name: "gallery" })}
+            onDelete={() => deleteProject(current.id)}
+            saveStatus={saveStatus}
+            theme={theme}
+            onToggleTheme={() => setTheme((t) => (t === "dark" ? "light" : "dark"))}
+            persistent={persistent}
+          />
+        </Suspense>
       )}
 
       {warning && !dismissed && (

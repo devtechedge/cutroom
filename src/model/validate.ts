@@ -152,9 +152,17 @@ function sanitizeFrame(v: unknown, aspect: AspectRatio, fixes: ValidationIssue[]
   const height = frameHeightUnits(aspect);
   const rawObjects = Array.isArray(v.objects) ? v.objects.slice(0, MAX_OBJECTS_PER_FRAME) : [];
   const objects: FrameObject[] = [];
+  const seenObjectIds = new Set<string>();
   for (let i = 0; i < rawObjects.length; i++) {
     const o = sanitizeObject(rawObjects[i], height, fixes, `${path}.objects[${i}]`);
-    if (o) objects.push(o);
+    if (o) {
+      if (seenObjectIds.has(o.id)) {
+        fixes.push({ path: `${path}.objects[${i}].id`, message: "duplicate id; regenerated" });
+        o.id = newId();
+      }
+      seenObjectIds.add(o.id);
+      objects.push(o);
+    }
   }
   return {
     id: typeof v.id === "string" && v.id.length <= 64 ? v.id : newId(),

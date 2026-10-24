@@ -17,6 +17,7 @@ test("gallery passes axe", async ({ page }) => {
 test("mobile gallery and editor pass axe", async ({ page }) => {
   await page.setViewportSize({ width: 390, height: 844 });
   await page.goto("/");
+  await expect(page.getByRole("heading", { level: 1 })).toBeVisible();
   expect(await seriousViolations(page), "mobile gallery").toEqual([]);
   await page.getByRole("button", { name: /^Open board / }).first().click();
   await expect(page.getByLabel(/Stage: frame \d+ of \d+/)).toBeVisible();

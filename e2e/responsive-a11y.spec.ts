@@ -134,6 +134,7 @@ test.describe("accessibility", () => {
   test("keyboard-only reaches the timeline and moves frames", async ({ page }) => {
     await page.goto("/");
     await page.getByRole("button", { name: /^Open board / }).first().click();
+    await expect(page.getByLabel(/Stage: frame \d+ of \d+/)).toBeVisible();
     const durations = async () =>
       (await page.locator(".frame-card .card-meta").allTextContents()).map((t) => t.match(/[\d.]+s/)?.[0] ?? "").join(",");
     const before = await durations();

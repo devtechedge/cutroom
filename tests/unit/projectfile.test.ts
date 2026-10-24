@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { buildProjectFile, MAX_PROJECT_BYTES, parseProjectFile, remapAssetIds, serializeProjectFile } from "../../src/export/projectfile";
 import { importStoryboardFile } from "../../src/export/exporters";
-import { newImageObject, newStoryboard } from "../../src/model/defaults";
+import { newImageObject, newShapeObject, newStoryboard } from "../../src/model/defaults";
 import type { Asset, ImageObject } from "../../src/model/types";
 
 const asset: Asset = {
@@ -92,5 +92,17 @@ describe("project file", () => {
       text: () => Promise.resolve("{}"),
     } as unknown as File;
     await expect(importStoryboardFile(file)).rejects.toThrow(/25 MB/);
+  });
+
+  it("regenerates duplicate object ids on import", () => {
+    const board = newStoryboard({ title: "Duplicate ids" });
+    const first = newShapeObject({ shape: "rect" });
+    const second = newShapeObject({ shape: "ellipse" });
+    first.id = "same-id";
+    second.id = "same-id";
+    board.frames[0].objects.push(first, second);
+    const parsed = parseProjectFile(board);
+    expect(parsed.fixes.some((fix) => fix.message.includes("duplicate id"))).toBe(true);
+    expect(new Set(parsed.sb.frames[0].objects.map((object) => object.id)).size).toBe(2);
   });
 });

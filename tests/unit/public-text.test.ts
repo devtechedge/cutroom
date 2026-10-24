@@ -3,8 +3,8 @@ import { join, relative } from "node:path";
 import { describe, expect, it } from "vitest";
 
 const root = process.cwd();
-const roots = ["src"];
-const files = ["README.md", "index.html", "SECURITY.md", "LICENSES.md"];
+const roots = ["src", "docs", ".github"];
+const files = ["README.md", "index.html", "SECURITY.md", "LICENSES.md", "CONTRIBUTING.md", "CHANGELOG.md"];
 
 function walk(dir: string): string[] {
   const out: string[] = [];

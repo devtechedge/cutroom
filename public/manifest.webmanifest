@@ -1,0 +1,23 @@
+{
+  "name": "CUTROOM",
+  "short_name": "CUTROOM",
+  "description": "A cinematic storyboard and visual narrative studio for composing frames, timing sequences, previewing cuts and exporting contact sheets.",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "orientation": "any",
+  "background_color": "#1d1b18",
+  "theme_color": "#1d1b18",
+  "icons": [
+    {
+      "src": "/favicon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml"
+    },
+    {
+      "src": "/apple-touch-icon.png",
+      "sizes": "180x180",
+      "type": "image/png"
+    }
+  ]
+}
