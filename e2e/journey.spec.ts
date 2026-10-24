@@ -129,8 +129,31 @@ test.describe("CUTROOM journey", () => {
     await title.blur();
     await expect(page.locator(".save-status")).toContainText("Saved", { timeout: 5000 });
     await page.reload();
-    await page.getByRole("button", { name: /^Open board Persistence Probe/ }).click();
     await expect(page.getByLabel("Board title")).toHaveValue("Persistence Probe");
+  });
+
+  test("board route restores on reload and Back returns to the gallery", async ({ page }) => {
+    await openFirstBoard(page);
+    expect(page.url()).toContain("#/board/");
+    await page.reload();
+    await expect(page.getByLabel("Board title")).toBeVisible();
+    await page.getByRole("button", { name: "Back to gallery" }).click();
+    await expect(page.getByRole("heading", { level: 1 })).toBeVisible();
+    expect(page.url()).not.toContain("#/board/");
+  });
+
+  test("missing board routes fall back to the gallery", async ({ page }) => {
+    await page.goto("/#/board/missing-board");
+    await expect(page.getByRole("heading", { level: 1 })).toBeVisible();
+    expect(page.url()).not.toContain("missing-board");
+  });
+
+  test("a second tab warns when the same board is open", async ({ page, context }) => {
+    await openFirstBoard(page);
+    const other = await context.newPage();
+    await other.goto(page.url());
+    await expect(page.locator(".toast")).toContainText("another tab");
+    await other.close();
   });
 
   test("project JSON export downloads a file", async ({ page }) => {

@@ -8,6 +8,7 @@ import { ASPECT_RATIOS, type AspectRatio, type FrameObject, type ShapeObject, ty
 import type { Asset } from "../model/types";
 import type { AssetResolver } from "../render/primitives";
 import { exportFramePng, exportProjectJson, exportSheetPng, exportSheetSvg } from "../export/exporters";
+import { fileToAsset } from "../lib/assets";
 import { Stage } from "./Stage";
 import { Inspector } from "./Inspector";
 import { Timeline } from "./Timeline";
@@ -145,7 +146,6 @@ function EditorInner({ resolve, assets, onAddAsset, onBack, onDelete, saveStatus
       const file = input.files?.[0];
       if (!file || !frame) return;
       try {
-        const { fileToAsset } = await import("../lib/assets");
         const asset = await fileToAsset(file);
         const ratio = asset.width / Math.max(asset.height, 1);
         const w = Math.min(720, Math.max(120, Math.round(ratio * 300)));
@@ -163,6 +163,7 @@ function EditorInner({ resolve, assets, onAddAsset, onBack, onDelete, saveStatus
   };
 
   const runExport = async (kind: "sheet-png" | "sheet-svg" | "frame-png" | "json"): Promise<void> => {
+    if (exporting) return;
     setExporting(true);
     try {
       if (kind === "json") {
@@ -228,9 +229,11 @@ function EditorInner({ resolve, assets, onAddAsset, onBack, onDelete, saveStatus
             aria-haspopup="menu"
             aria-expanded={exportMenu}
             aria-controls={exportMenu ? exportMenuId : undefined}
+            aria-busy={exporting}
             data-pressed={exportMenu}
-            disabled={exporting}
-            onClick={() => setExportMenu((v) => !v)}
+            onClick={() => {
+              if (!exporting) setExportMenu((v) => !v);
+            }}
           >
             <Icon name="download" size={14} />
             <span className="hide-mobile">Export</span>
