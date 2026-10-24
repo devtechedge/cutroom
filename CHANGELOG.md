@@ -1,5 +1,13 @@
 # Changelog
 
+## v1.2.1 (2026-10-24)
+
+### Changed
+
+- Starter persistence and orphaned image cleanup wait for idle time, so the first board grid can paint and respond sooner.
+- The welcome, legal and print views load as route chunks instead of entering the initial bundle.
+- Frame art is memoized per frame and asset set, avoiding repeated SVG generation during unrelated renders.
+
 ## v1.2.0 (2026-10-24)
 
 ### Added

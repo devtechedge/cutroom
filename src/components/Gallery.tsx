@@ -6,7 +6,7 @@ import { formatWhen } from "../lib/format";
 import type { TrashRecord } from "../persist/store";
 import { FrameImageView } from "./FrameView";
 import { Icon } from "./Icon";
-import { SiteFooter } from "./InfoPages";
+import { SiteFooter } from "./SiteFooter";
 import { ConfirmDialog, MenuButton } from "./ui";
 
 export interface GalleryProps {
