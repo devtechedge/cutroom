@@ -6,3 +6,7 @@ qa-shots
 *.tsbuildinfo
 .env
 .DS_Store
+
+.vercel
+.env*
+.env.local
