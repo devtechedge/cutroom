@@ -79,7 +79,12 @@ export function Stage({ resolve, zoom }: StageProps): JSX.Element {
       isLine: obj.kind === "shape" && obj.shape === "line",
       scale,
     };
-    e.currentTarget.setPointerCapture(e.pointerId);
+    try {
+      e.currentTarget.setPointerCapture(e.pointerId);
+    } catch {
+      // pointer may already be gone (synthetic events, fast taps); the move
+      // listeners on the stage stack keep the drag working either way
+    }
   };
 
   const onPointerMove = (e: ReactPointerEvent<HTMLElement>): void => {

@@ -62,7 +62,11 @@ export function Timeline({ resolve }: TimelineProps): JSX.Element {
   const onCardPointerDown = (e: ReactPointerEvent<HTMLElement>, index: number): void => {
     if (e.button !== 0) return;
     dragRef.current = { fromIndex: index, pointerId: e.pointerId, insertAt: index, active: false };
-    e.currentTarget.setPointerCapture(e.pointerId);
+    try {
+      e.currentTarget.setPointerCapture(e.pointerId);
+    } catch {
+      // synthetic or vanished pointer; reorder falls back to element hit tests
+    }
   };
 
   const onStripPointerMove = (e: ReactPointerEvent<HTMLElement>): void => {
