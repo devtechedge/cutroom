@@ -14,10 +14,14 @@ CUTROOM is a client-only creative tool. There is no server, no account system, a
 - Injection: imported JSON cannot introduce executable content; colors must match `#rrggbb`, enums are validated against fixed lists, numbers are clamped, strings are length-capped, and object/frame counts are bounded.
 - Storage: persistence failures (blocked IndexedDB, quota) degrade to an in-memory session with an explicit banner rather than failing silently.
 
+## Surface
+
+- No API routes, no cookies, no auth, no CORS surface, no server secrets and no payment flow.
+
 ## Residual risks
 
 - Anyone with access to the visitor's browser profile can read the stored boards; treat IndexedDB as non-confidential local storage and export/delete boards you do not want to keep on a shared machine.
-- The dependency tree is audited on the main branch (`npm audit --omit=dev` in CI is advisory; no production server exists to harden).
+- The production dependency tree is audited in CI with `npm audit --omit=dev`. Dev-only toolchain advisories are tracked separately and never ship in the static bundle.
 
 ## Reporting
 
