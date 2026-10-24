@@ -9,6 +9,7 @@ import { fileToAsset } from "../lib/assets";
 import { Icon, type IconName } from "./Icon";
 
 export interface InspectorProps {
+  open: boolean;
   onAddAsset: (asset: Asset) => void;
   onToast: (msg: string) => void;
 }
@@ -102,11 +103,11 @@ const KIND_META: Record<FrameObject["kind"], { icon: IconName; label: string }> 
   text: { icon: "text", label: "Text" },
 };
 
-export function Inspector({ onAddAsset, onToast }: InspectorProps): JSX.Element {
+export function Inspector({ open, onAddAsset, onToast }: InspectorProps): JSX.Element {
   const ed = useEditor();
   const { sb, frame, object, frameIndex } = ed;
   if (!frame) {
-    return <aside className="inspector" aria-label="Inspector" />;
+    return <aside className="inspector" data-open={open} aria-label="Inspector" />;
   }
 
   const runFrame = (label: string, patch: Parameters<typeof ops.setFrameMeta>[2]): void =>
@@ -146,7 +147,7 @@ export function Inspector({ onAddAsset, onToast }: InspectorProps): JSX.Element 
   };
 
   return (
-    <aside className="inspector" aria-label="Inspector">
+    <aside className="inspector" data-open={open} aria-label="Inspector">
       <div className="inspector-inner">
         {object ? (
           <>

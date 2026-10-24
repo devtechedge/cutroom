@@ -225,9 +225,9 @@ function EditorInner({ resolve, onAddAsset, onBack, onDelete, saveStatus, theme,
             />
           )}
         </span>
-        <button type="button" className="btn small primary" onClick={() => setPreview(true)}>
+        <button type="button" className="btn small primary" aria-label="Preview the sequence" onClick={() => setPreview(true)}>
           <Icon name="play" size={14} />
-          Preview
+          <span className="hide-mobile">Preview</span>
         </button>
         <MenuButton
           icon={<Icon name="sliders" />}
@@ -308,7 +308,7 @@ function EditorInner({ resolve, onAddAsset, onBack, onDelete, saveStatus, theme,
           )}
         </div>
         <button type="button" className="inspector-scrim" aria-label="Close inspector" hidden={!inspectorOpen} onClick={() => setInspectorOpen(false)} />
-        <Inspector onAddAsset={onAddAsset} onToast={showToast} />
+        <Inspector open={inspectorOpen} onAddAsset={onAddAsset} onToast={showToast} />
       </div>
 
       <Timeline resolve={resolve} />
